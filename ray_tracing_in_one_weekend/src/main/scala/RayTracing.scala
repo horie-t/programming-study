@@ -123,9 +123,22 @@ object RayTracing extends App {
     print(s"${ir} ${ig} ${ib}\n")
   }
 
+  def hitSphere(center: Vec3, radius: Float, r: Ray): Boolean = {
+    val oc = r.origin() - center
+    val a = dot(r.direction(), r.direction())
+    val b = 2.0f * dot(oc, r.direction())
+    val c = dot(oc, oc) - radius * radius
+    val discriminant = b * b - 4.0f * a * c
+    discriminant > 0
+  }
+
   def color(r: Ray): Vec3 = {
-    val unitDirection = unitVector(r.direction())
-    val t = 0.5f * (unitDirection.y + 1.0f)
-    (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
+    if (hitSphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, r)) {
+      Vec3(1.0f, 0.0f, 0.0f)
+    } else {
+      val unitDirection = unitVector(r.direction())
+      val t = 0.5f * (unitDirection.y + 1.0f)
+      (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
+    }
   }
 }
