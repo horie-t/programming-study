@@ -123,18 +123,24 @@ object RayTracing extends App {
     print(s"${ir} ${ig} ${ib}\n")
   }
 
-  def hitSphere(center: Vec3, radius: Float, r: Ray): Boolean = {
+  def hitSphere(center: Vec3, radius: Float, r: Ray): Float = {
     val oc = r.origin() - center
     val a = dot(r.direction(), r.direction())
     val b = 2.0f * dot(oc, r.direction())
     val c = dot(oc, oc) - radius * radius
     val discriminant = b * b - 4.0f * a * c
-    discriminant > 0
+    if (discriminant < 0) {
+      -1.0f
+    } else {
+      (-b - math.sqrt(discriminant).toFloat) / (2.0f * a)
+    }
   }
 
   def color(r: Ray): Vec3 = {
-    if (hitSphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, r)) {
-      Vec3(1.0f, 0.0f, 0.0f)
+    val t = hitSphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, r)
+    if (t > 0.0f) {
+      val N = unitVector(r.pointAtParameter(t) - Vec3(0.0f, 0.0f, -1.0f))
+      0.5f * Vec3(N.x + 1.0f, N.y + 1.0f, N.z + 1.0f)
     } else {
       val unitDirection = unitVector(r.direction())
       val t = 0.5f * (unitDirection.y + 1.0f)
