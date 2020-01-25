@@ -91,6 +91,8 @@ object Vec3 {
   def unitVector(v: Vec3): Vec3 = v / v.length()
 }
 
+import Vec3._
+
 class Ray(val A: Vec3, val B: Vec3) {
   def origin(): Vec3 = A
   def direction(): Vec3 = B
@@ -101,7 +103,51 @@ object Ray {
   def apply(A: Vec3, B: Vec3): Ray = new Ray(A, B)
 }
 
-import Vec3._
+case class HitRecord(t: Float, p: Vec3, normal: Vec3)
+
+trait Hittable {
+  def hit(ray: Ray, tMin: Float, tMax: Float): Option[HitRecord]
+}
+
+object Hittable {
+  def hit(ray: Ray, tMin: Float, tMax: Float, hittables: Seq[Hittable]): Option[HitRecord] = {
+    val hits = hittables.map(_.hit(ray, tMin, tMax)).flatten
+    if (hits.isEmpty) {
+      None
+    } else {
+      Some(hits.minBy(_.t))
+    }
+  }
+}
+
+class Sphere(val center: Vec3, val radius: Float) extends Hittable {
+  override def hit(ray: Ray, tMin: Float, tMax: Float): Option[HitRecord] = {
+    val oc = ray.origin() - center
+    val a = dot(ray.direction(), ray.direction())
+    val b = dot(oc, ray.direction())
+    val c = dot(oc, oc) - radius * radius
+    val discriminant = b * b - a * c
+    if (discriminant > 0) {
+      val t = (-b - math.sqrt(discriminant).toFloat) / a
+      if (tMin < t && t < tMax) {
+        val p = ray.pointAtParameter(t)
+        val normal = (p - center) / radius
+        Some(HitRecord(t, p, normal))
+      } else {
+        val t = (-b + math.sqrt(discriminant).toFloat) / a
+        if (tMin < t && t < tMax) {
+          val p = ray.pointAtParameter(t)
+          val normal = (p - center) / radius
+          Some(HitRecord(t, p, normal))
+        } else {
+          None
+        }
+      }
+    } else {
+      None
+    }
+  }
+}
 
 object RayTracing extends App {
   val nx = 200
@@ -111,12 +157,16 @@ object RayTracing extends App {
   val horizontal = Vec3(4.0f, 0.0f, 0.0f)
   val vertical = Vec3(0.0f, 2.0f, 0.0f)
   val origin = Vec3(0.0f, 0.0f, 0.0f)
+
+  val world = Seq(new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f),
+    new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f))
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
     val u = i.toFloat / nx.toFloat
     val v = j.toFloat / ny.toFloat
     val ray = Ray(origin, lowerLeftCorner + (u * horizontal) + (v * vertical))
-    val col = color(ray)
+
+    val col = color(ray, world)
     val ir = (255.99f * col(0)).toInt
     val ig = (255.99f * col(1)).toInt
     val ib = (255.99f * col(2)).toInt
@@ -136,15 +186,14 @@ object RayTracing extends App {
     }
   }
 
-  def color(r: Ray): Vec3 = {
-    val t = hitSphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, r)
-    if (t > 0.0f) {
-      val N = unitVector(r.pointAtParameter(t) - Vec3(0.0f, 0.0f, -1.0f))
-      0.5f * Vec3(N.x + 1.0f, N.y + 1.0f, N.z + 1.0f)
-    } else {
-      val unitDirection = unitVector(r.direction())
-      val t = 0.5f * (unitDirection.y + 1.0f)
-      (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
+  def color(r: Ray, hittables: Seq[Hittable]): Vec3 = {
+    Hittable.hit(r, 0.0f, Float.MaxValue, hittables) match {
+      case Some(rec) => 0.5f * Vec3(rec.normal.x + 1, rec.normal.y + 1, rec.normal.z + 1)
+      case None => {
+        val unitDirection = unitVector(r.direction())
+        val t = 0.5f * (unitDirection.y + 1.0f)
+        (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
+      }
     }
   }
 }
