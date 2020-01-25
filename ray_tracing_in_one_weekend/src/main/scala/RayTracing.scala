@@ -176,12 +176,13 @@ object RayTracing extends App {
     new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f))
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
-    val col = Seq.fill(ns){
-      val u = (i.toFloat + Random.between(0.0f, 1.0f)) / nx.toFloat
-      val v = (j.toFloat + Random.between(0.0f, 1.0f)) / ny.toFloat
+    val colTmp = Seq.fill(ns){
+      val u = (i.toFloat + Random.nextFloat()) / nx.toFloat
+      val v = (j.toFloat + Random.nextFloat()) / ny.toFloat
       val r = cam.getRay(u, v)
       color(r, world)
     }.reduceLeft(_ + _) / ns
+    val col = Vec3(math.sqrt(colTmp(0)).toFloat, math.sqrt(colTmp(1)).toFloat, math.sqrt(colTmp(2)).toFloat)
 
     val ir = (255.99f * col(0)).toInt
     val ig = (255.99f * col(1)).toInt
@@ -190,13 +191,22 @@ object RayTracing extends App {
   }
 
   def color(r: Ray, hittables: Seq[Hittable]): Vec3 = {
-    Hittable.hit(r, 0.0f, Float.MaxValue, hittables) match {
-      case Some(rec) => 0.5f * Vec3(rec.normal.x + 1, rec.normal.y + 1, rec.normal.z + 1)
+    Hittable.hit(r, 0.001f, Float.MaxValue, hittables) match {
+      case Some(rec) => {
+        val target = rec.p + rec.normal + randomInUitSphere()
+        0.5f * color(Ray(rec.p, target - rec.p), hittables)
+      }
       case None => {
         val unitDirection = unitVector(r.direction())
         val t = 0.5f * (unitDirection.y + 1.0f)
         (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
       }
     }
+  }
+
+  def randomInUitSphere(): Vec3 = {
+    def randVecs: Stream[Vec3] = (2.0f * Vec3(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())
+      - Vec3(1.0f, 1.0f, 1.0f)) #:: randVecs
+    randVecs.filter(_.squared_length >= 1.0f).head
   }
 }
