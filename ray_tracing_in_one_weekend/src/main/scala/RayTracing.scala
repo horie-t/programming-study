@@ -163,6 +163,17 @@ trait Material {
   def scatter(ray: Ray, hitRecord: HitRecord): Option[(Vec3, Ray)]
 
   def reflect(v: Vec3, n: Vec3): Vec3 = v - 2 * dot(v, n) * n
+
+  def refract(v: Vec3, n: Vec3, niOverNt: Float): Option[Vec3] = {
+    val uv = unitVector(v)
+    val dt = dot(uv, n)
+    val discriminant = 1.0f - niOverNt * niOverNt * (1 - dt * dt)
+    if (discriminant > 0) {
+      Some(niOverNt * (uv - n * dt) - n * math.sqrt(discriminant).toFloat)
+    } else {
+      None
+    }
+  }
 }
 
 class Lambertian(val albedo: Vec3) extends Material {
@@ -181,6 +192,21 @@ class Metal(val albedo: Vec3, val fuzz: Float) extends Material {
       Some((albedo, scattered))
     } else {
       None
+    }
+  }
+}
+
+class Dielectric(val refIdx: Float) extends Material {
+  override def scatter(ray: Ray, rec: HitRecord): Option[(Vec3, Ray)] = {
+    val (outwardNormal, niOverNt) = if (dot(ray.direction, rec.normal) > 0.0f) {
+      (-rec.normal, refIdx)
+    } else {
+      (rec.normal, 1.0f / refIdx)
+    }
+
+    refract(ray.direction, outwardNormal, niOverNt) match {
+      case Some(refracted) => Some(Vec3(1.0f, 1.0f, 1.0f), Ray(rec.p, refracted))
+      case None => None
     }
   }
 }
@@ -209,10 +235,10 @@ object RayTracing extends App {
   val cam = new Camera
 
   val world = Seq(
-    new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(Vec3(0.8f, 0.3f, 0.3f))),
+    new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(Vec3(0.1f, 0.2f, 0.5f))),
     new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f, new Lambertian(Vec3(0.8f, 0.8f, 0.0f))),
     new Sphere(Vec3(1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.6f, 0.2f), 0.3f)),
-    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.8f, 0.8f), 0.0f)))
+    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Dielectric(1.5f)))
 
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
