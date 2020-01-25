@@ -94,8 +94,8 @@ object Vec3 {
 import Vec3._
 
 class Ray(val A: Vec3, val B: Vec3) {
-  def origin(): Vec3 = A
-  def direction(): Vec3 = B
+  def origin: Vec3 = A
+  def direction: Vec3 = B
   def pointAtParameter(t: Float) = A + (t * B)
 }
 
@@ -132,9 +132,9 @@ import Hittable._
 
 class Sphere(val center: Vec3, val radius: Float, val material: Material) extends Hittable {
   override def hit(ray: Ray, tMin: Float, tMax: Float): Option[HitRecord] = {
-    val oc = ray.origin() - center
-    val a = dot(ray.direction(), ray.direction())
-    val b = dot(oc, ray.direction())
+    val oc = ray.origin - center
+    val a = dot(ray.direction, ray.direction)
+    val b = dot(oc, ray.direction)
     val c = dot(oc, oc) - radius * radius
     val discriminant = b * b - a * c
     if (discriminant > 0) {
@@ -186,9 +186,9 @@ class Lambertian(val albedo: Vec3) extends Material {
 
 class Metal(val albedo: Vec3, val fuzz: Float) extends Material {
   override def scatter(ray: Ray, rec: HitRecord): Option[(Vec3, Ray)] = {
-    val reflected = reflect(unitVector(ray.direction()), rec.normal)
+    val reflected = reflect(unitVector(ray.direction), rec.normal)
     val scattered = Ray(rec.p, reflected + fuzz * randomInUitSphere())
-    if (dot(scattered.direction(), rec.normal) > 0) {
+    if (dot(scattered.direction, rec.normal) > 0) {
       Some((albedo, scattered))
     } else {
       None
@@ -197,17 +197,32 @@ class Metal(val albedo: Vec3, val fuzz: Float) extends Material {
 }
 
 class Dielectric(val refIdx: Float) extends Material {
+  import util._
+
   override def scatter(ray: Ray, rec: HitRecord): Option[(Vec3, Ray)] = {
-    val (outwardNormal, niOverNt) = if (dot(ray.direction, rec.normal) > 0.0f) {
-      (-rec.normal, refIdx)
+    val attenuation = Vec3(1.0f, 1.0f, 1.0f)
+    val (outwardNormal, niOverNt, cosine) = if (dot(ray.direction, rec.normal) > 0.0f) {
+      (-rec.normal, refIdx, refIdx * dot(ray.direction, rec.normal) / ray.direction.length())
     } else {
-      (rec.normal, 1.0f / refIdx)
+      (rec.normal, 1.0f / refIdx, - dot(ray.direction, rec.normal) / ray.direction.length())
     }
 
     refract(ray.direction, outwardNormal, niOverNt) match {
-      case Some(refracted) => Some(Vec3(1.0f, 1.0f, 1.0f), Ray(rec.p, refracted))
-      case None => None
+      case Some(refracted) => {
+        if (Random.nextFloat() < schlick(cosine, refIdx)) {
+          Some(attenuation, Ray(rec.p, reflect(ray.direction, rec.normal)))
+        } else {
+          Some(attenuation, Ray(rec.p, refracted))
+        }
+      }
+      case None => Some(attenuation, Ray(rec.p, reflect(ray.direction, rec.normal)))
     }
+  }
+
+  def schlick(cosine: Float, refIdx: Float): Float = {
+    val r0 = (1.0f - refIdx) / (1.0f + refIdx)
+    val r0sq = r0 * r0
+    r0 + (1.0f - r0) * math.pow((1.0f - cosine), 5.0f).toFloat
   }
 }
 
@@ -238,7 +253,9 @@ object RayTracing extends App {
     new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(Vec3(0.1f, 0.2f, 0.5f))),
     new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f, new Lambertian(Vec3(0.8f, 0.8f, 0.0f))),
     new Sphere(Vec3(1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.6f, 0.2f), 0.3f)),
-    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Dielectric(1.5f)))
+    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Dielectric(1.5f)),
+    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), -0.45f, new Dielectric(1.5f))
+  )
 
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
@@ -267,7 +284,7 @@ object RayTracing extends App {
         }
       }
       case None => {
-        val unitDirection = unitVector(r.direction())
+        val unitDirection = unitVector(r.direction)
         val t = 0.5f * (unitDirection.y + 1.0f)
         (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
       }
