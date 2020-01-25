@@ -173,19 +173,6 @@ object RayTracing extends App {
     print(s"${ir} ${ig} ${ib}\n")
   }
 
-  def hitSphere(center: Vec3, radius: Float, r: Ray): Float = {
-    val oc = r.origin() - center
-    val a = dot(r.direction(), r.direction())
-    val b = 2.0f * dot(oc, r.direction())
-    val c = dot(oc, oc) - radius * radius
-    val discriminant = b * b - 4.0f * a * c
-    if (discriminant < 0) {
-      -1.0f
-    } else {
-      (-b - math.sqrt(discriminant).toFloat) / (2.0f * a)
-    }
-  }
-
   def color(r: Ray, hittables: Seq[Hittable]): Vec3 = {
     Hittable.hit(r, 0.0f, Float.MaxValue, hittables) match {
       case Some(rec) => 0.5f * Vec3(rec.normal.x + 1, rec.normal.y + 1, rec.normal.z + 1)
