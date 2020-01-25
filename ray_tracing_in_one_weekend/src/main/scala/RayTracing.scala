@@ -173,10 +173,10 @@ class Lambertian(val albedo: Vec3) extends Material {
   }
 }
 
-class Metal(val albedo: Vec3) extends Material {
+class Metal(val albedo: Vec3, val fuzz: Float) extends Material {
   override def scatter(ray: Ray, rec: HitRecord): Option[(Vec3, Ray)] = {
     val reflected = reflect(unitVector(ray.direction()), rec.normal)
-    val scattered = Ray(rec.p, reflected)
+    val scattered = Ray(rec.p, reflected + fuzz * randomInUitSphere())
     if (dot(scattered.direction(), rec.normal) > 0) {
       Some((albedo, scattered))
     } else {
@@ -211,9 +211,9 @@ object RayTracing extends App {
   val world = Seq(
     new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(Vec3(0.8f, 0.3f, 0.3f))),
     new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f, new Lambertian(Vec3(0.8f, 0.8f, 0.0f))),
-    new Sphere(Vec3(1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.6f, 0.2f))),
-    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.8f, 0.8f))))
-  
+    new Sphere(Vec3(1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.6f, 0.2f), 0.3f)),
+    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.8f, 0.8f), 0.0f)))
+
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
     val colTmp = Seq.fill(ns){
