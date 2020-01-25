@@ -149,24 +149,40 @@ class Sphere(val center: Vec3, val radius: Float) extends Hittable {
   }
 }
 
+class Camera {
+  val origin = Vec3(0.0f, 0.0f, 0.0f)
+  val lowerLeftCorner = Vec3(-2.0f, -1.0f, -1.0f)
+  val horizontal = Vec3(4.0f, 0.0f, 0.0f)
+  val vertical = Vec3(0.0f, 2.0f, 0.0f)
+
+  def getRay(u: Float, v: Float): Ray = Ray(origin, lowerLeftCorner + u * horizontal + v * vertical - origin)
+}
+
 object RayTracing extends App {
+  import util._
+
   val nx = 200
   val ny = 100
+  val ns = 100
   print(s"P3\n${nx} ${ny}\n255\n")
+
   val lowerLeftCorner = Vec3(-2.0f, -1.0f, -1.0f)
   val horizontal = Vec3(4.0f, 0.0f, 0.0f)
   val vertical = Vec3(0.0f, 2.0f, 0.0f)
   val origin = Vec3(0.0f, 0.0f, 0.0f)
+  val cam = new Camera
 
   val world = Seq(new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f),
     new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f))
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
-    val u = i.toFloat / nx.toFloat
-    val v = j.toFloat / ny.toFloat
-    val ray = Ray(origin, lowerLeftCorner + (u * horizontal) + (v * vertical))
+    val col = Seq.fill(ns){
+      val u = (i.toFloat + Random.between(0.0f, 1.0f)) / nx.toFloat
+      val v = (j.toFloat + Random.between(0.0f, 1.0f)) / ny.toFloat
+      val r = cam.getRay(u, v)
+      color(r, world)
+    }.reduceLeft(_ + _) / ns
 
-    val col = color(ray, world)
     val ir = (255.99f * col(0)).toInt
     val ig = (255.99f * col(1)).toInt
     val ib = (255.99f * col(2)).toInt
