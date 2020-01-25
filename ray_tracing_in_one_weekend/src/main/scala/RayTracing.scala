@@ -103,13 +103,15 @@ object Ray {
   def apply(A: Vec3, B: Vec3): Ray = new Ray(A, B)
 }
 
-case class HitRecord(t: Float, p: Vec3, normal: Vec3)
+case class HitRecord(t: Float, p: Vec3, normal: Vec3, material: Material)
 
 trait Hittable {
   def hit(ray: Ray, tMin: Float, tMax: Float): Option[HitRecord]
 }
 
 object Hittable {
+  import util._
+
   def hit(ray: Ray, tMin: Float, tMax: Float, hittables: Seq[Hittable]): Option[HitRecord] = {
     val hits = hittables.map(_.hit(ray, tMin, tMax)).flatten
     if (hits.isEmpty) {
@@ -118,9 +120,17 @@ object Hittable {
       Some(hits.minBy(_.t))
     }
   }
+
+  def randomInUitSphere(): Vec3 = {
+    def randVecs: Stream[Vec3] = (2.0f * Vec3(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())
+      - Vec3(1.0f, 1.0f, 1.0f)) #:: randVecs
+    randVecs.filter(_.squared_length >= 1.0f).head
+  }
 }
 
-class Sphere(val center: Vec3, val radius: Float) extends Hittable {
+import Hittable._
+
+class Sphere(val center: Vec3, val radius: Float, val material: Material) extends Hittable {
   override def hit(ray: Ray, tMin: Float, tMax: Float): Option[HitRecord] = {
     val oc = ray.origin() - center
     val a = dot(ray.direction(), ray.direction())
@@ -132,17 +142,43 @@ class Sphere(val center: Vec3, val radius: Float) extends Hittable {
       if (tMin < t && t < tMax) {
         val p = ray.pointAtParameter(t)
         val normal = (p - center) / radius
-        Some(HitRecord(t, p, normal))
+        Some(HitRecord(t, p, normal, material))
       } else {
         val t = (-b + math.sqrt(discriminant).toFloat) / a
         if (tMin < t && t < tMax) {
           val p = ray.pointAtParameter(t)
           val normal = (p - center) / radius
-          Some(HitRecord(t, p, normal))
+          Some(HitRecord(t, p, normal, material))
         } else {
           None
         }
       }
+    } else {
+      None
+    }
+  }
+}
+
+trait Material {
+  def scatter(ray: Ray, hitRecord: HitRecord): Option[(Vec3, Ray)]
+
+  def reflect(v: Vec3, n: Vec3): Vec3 = v - 2 * dot(v, n) * n
+}
+
+class Lambertian(val albedo: Vec3) extends Material {
+  override def scatter(ray: Ray, rec: HitRecord): Option[(Vec3, Ray)] = {
+    val target = rec.p + rec.normal + randomInUitSphere()
+    val scattered = Ray(rec.p, target - rec.p)
+    Some((albedo, scattered))
+  }
+}
+
+class Metal(val albedo: Vec3) extends Material {
+  override def scatter(ray: Ray, rec: HitRecord): Option[(Vec3, Ray)] = {
+    val reflected = reflect(unitVector(ray.direction()), rec.normal)
+    val scattered = Ray(rec.p, reflected)
+    if (dot(scattered.direction(), rec.normal) > 0) {
+      Some((albedo, scattered))
     } else {
       None
     }
@@ -172,15 +208,19 @@ object RayTracing extends App {
   val origin = Vec3(0.0f, 0.0f, 0.0f)
   val cam = new Camera
 
-  val world = Seq(new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f),
-    new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f))
+  val world = Seq(
+    new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(Vec3(0.8f, 0.3f, 0.3f))),
+    new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f, new Lambertian(Vec3(0.8f, 0.8f, 0.0f))),
+    new Sphere(Vec3(1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.6f, 0.2f))),
+    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.8f, 0.8f))))
+  
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
     val colTmp = Seq.fill(ns){
       val u = (i.toFloat + Random.nextFloat()) / nx.toFloat
       val v = (j.toFloat + Random.nextFloat()) / ny.toFloat
       val r = cam.getRay(u, v)
-      color(r, world)
+      color(r, world, 0)
     }.reduceLeft(_ + _) / ns
     val col = Vec3(math.sqrt(colTmp(0)).toFloat, math.sqrt(colTmp(1)).toFloat, math.sqrt(colTmp(2)).toFloat)
 
@@ -190,11 +230,15 @@ object RayTracing extends App {
     print(s"${ir} ${ig} ${ib}\n")
   }
 
-  def color(r: Ray, hittables: Seq[Hittable]): Vec3 = {
+  def color(r: Ray, hittables: Seq[Hittable], depth: Int): Vec3 = {
     Hittable.hit(r, 0.001f, Float.MaxValue, hittables) match {
       case Some(rec) => {
-        val target = rec.p + rec.normal + randomInUitSphere()
-        0.5f * color(Ray(rec.p, target - rec.p), hittables)
+        rec.material.scatter(r, rec) match {
+          case Some((attenuation, scatterd)) if (depth < 50) => {
+            attenuation * color(scatterd, hittables, depth + 1)
+          }
+          case _ => Vec3(0.0f, 0.0f, 0.0f)
+        }
       }
       case None => {
         val unitDirection = unitVector(r.direction())
@@ -202,11 +246,5 @@ object RayTracing extends App {
         (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
       }
     }
-  }
-
-  def randomInUitSphere(): Vec3 = {
-    def randVecs: Stream[Vec3] = (2.0f * Vec3(Random.nextFloat(), Random.nextFloat(), Random.nextFloat())
-      - Vec3(1.0f, 1.0f, 1.0f)) #:: randVecs
-    randVecs.filter(_.squared_length >= 1.0f).head
   }
 }
