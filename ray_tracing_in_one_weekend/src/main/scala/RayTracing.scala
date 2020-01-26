@@ -126,6 +126,12 @@ object Hittable {
       - Vec3(1.0f, 1.0f, 1.0f)) #:: randVecs
     randVecs.filter(_.squared_length >= 1.0f).head
   }
+
+  def ramdomInUnitDisk(): Vec3 = {
+    def randVecs: Stream[Vec3] = (2.0f * Vec3(Random.nextFloat(), Random.nextFloat(), 0.0f)
+      - Vec3(1.0f, 1.0f, 0.0f)) #:: randVecs
+    randVecs.filter(p => dot(p, p) >= 1.0f).head
+  }
 }
 
 import Hittable._
@@ -226,7 +232,9 @@ class Dielectric(val refIdx: Float) extends Material {
   }
 }
 
-class Camera(val lookFrom: Vec3, val lookAt: Vec3, val vUp: Vec3, val vfov: Float, aspect: Float) {
+class Camera(val lookFrom: Vec3, val lookAt: Vec3, val vUp: Vec3, val vfov: Float, aspect: Float,
+             val aperture: Float, val focusDist: Float) {
+  val lensRadius = aperture / 2.0f
   val theta = vfov * math.Pi.toFloat / 180.0f
   val halfHeight = math.tan(theta / 2.0f).toFloat
   val halfWidth = aspect * halfHeight
@@ -234,11 +242,18 @@ class Camera(val lookFrom: Vec3, val lookAt: Vec3, val vUp: Vec3, val vfov: Floa
   val w = unitVector(lookFrom - lookAt)
   val u = unitVector(cross(vUp, w))
   val v = cross(w, u)
-  val lowerLeftCorner = origin - halfWidth * u - halfHeight * v - w
-  val horizontal = 2 * halfWidth * u
-  val vertical = 2 * halfHeight * v
+  val lowerLeftCorner = origin -
+    halfWidth * focusDist * u -
+    halfHeight * focusDist * v -
+    focusDist * w
+  val horizontal = 2 * halfWidth * focusDist * u
+  val vertical = 2 * halfHeight * focusDist * v
 
-  def getRay(u: Float, v: Float): Ray = Ray(origin, lowerLeftCorner + u * horizontal + v * vertical - origin)
+  def getRay(s: Float, t: Float): Ray = {
+    val rd = lensRadius * randomInUitSphere()
+    val offset = u * rd.x + v * rd.y
+    Ray(origin + offset, lowerLeftCorner + s * horizontal + t * vertical - origin - offset)
+  }
 }
 
 object RayTracing extends App {
@@ -249,12 +264,12 @@ object RayTracing extends App {
   val ns = 100
   print(s"P3\n${nx} ${ny}\n255\n")
 
-  val lowerLeftCorner = Vec3(-2.0f, -1.0f, -1.0f)
-  val horizontal = Vec3(4.0f, 0.0f, 0.0f)
-  val vertical = Vec3(0.0f, 2.0f, 0.0f)
-  val origin = Vec3(0.0f, 0.0f, 0.0f)
-  val cam = new Camera(Vec3(-0.2f, 0.75f, -0.7f), Vec3(0.0f, 0.0f, -1.0f), Vec3(0.0f, 1.0f, 0.0f),
-    90.0f, nx.toFloat/ ny.toFloat)
+  val lookFrom = Vec3(3.0f, 3.0f, 2.0f)
+  val lookAt   = Vec3(0.0f, 0.0f, -1.0f)
+  val distToFocus = (lookFrom - lookAt).length()
+  val aperture = 2.0f
+  val cam = new Camera(lookFrom, lookAt, Vec3(0.0f, 1.0f, 0.0f),
+    20.0f, nx.toFloat/ ny.toFloat, aperture, distToFocus)
 
   val R = math.cos(math.Pi.toFloat / 4.0f).toFloat
   val world = Seq(
