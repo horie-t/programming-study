@@ -259,26 +259,19 @@ class Camera(val lookFrom: Vec3, val lookAt: Vec3, val vUp: Vec3, val vfov: Floa
 object RayTracing extends App {
   import util._
 
-  val nx = 200
-  val ny = 100
+  val nx = 1200
+  val ny = 800
   val ns = 100
   print(s"P3\n${nx} ${ny}\n255\n")
 
-  val lookFrom = Vec3(3.0f, 3.0f, 2.0f)
-  val lookAt   = Vec3(0.0f, 0.0f, -1.0f)
-  val distToFocus = (lookFrom - lookAt).length()
-  val aperture = 2.0f
+  val lookFrom = Vec3(13.0f, 2.0f, 3.0f)
+  val lookAt   = Vec3(0.0f, 0.0f, 0.0f)
+  val distToFocus = 10.0f
+  val aperture = 0.1f
   val cam = new Camera(lookFrom, lookAt, Vec3(0.0f, 1.0f, 0.0f),
     20.0f, nx.toFloat/ ny.toFloat, aperture, distToFocus)
 
-  val R = math.cos(math.Pi.toFloat / 4.0f).toFloat
-  val world = Seq(
-    new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(Vec3(0.1f, 0.2f, 0.5f))),
-    new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f, new Lambertian(Vec3(0.8f, 0.8f, 0.0f))),
-    new Sphere(Vec3(1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.6f, 0.2f), 0.3f)),
-    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Dielectric(1.5f)),
-    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), -0.45f, new Dielectric(1.5f))
-  )
+  val world = randomScene()
 
   for (j <- (ny - 1) to 0 by -1;
        i <- 0 until nx) {
@@ -312,5 +305,42 @@ object RayTracing extends App {
         (1.0f - t) * Vec3(1.0f, 1.0f, 1.0f) + t * Vec3(0.5f, 0.7f, 1.0f)
       }
     }
+  }
+
+  def randomScene(): Seq[Hittable] = {
+    val ground = new Sphere(Vec3(0.0f, -1000.0f, 0.0f), 1000.0f, new Lambertian(Vec3(0.5f, 0.5f, 0.5f)))
+    val smallSpheres = for (
+      a <- -11 until 11;
+      b <- -11 until 11
+    ) yield {
+      val center = Vec3(a.toFloat + 0.9f * Random.nextFloat(), 0.2f, b.toFloat + 0.9f * Random.nextFloat())
+      if ((center - Vec3(4.0f, 0.2f, 0.0f)).length() > 0.9) {
+        val chooseMat = Random.nextFloat()
+        if (chooseMat < 0.8f) {
+          Some(new Sphere(center, 0.2f,
+            new Lambertian(Vec3(Random.nextFloat() * Random.nextFloat(),
+              Random.nextFloat() * Random.nextFloat(),
+              Random.nextFloat() * Random.nextFloat()))))
+        } else if (chooseMat < 0.95f) {
+          Some(new Sphere(center, 0.2f,
+            new Metal(Vec3(0.5f * (1.0f + Random.nextFloat()),
+              0.5f * (1.0f + Random.nextFloat()),
+              0.5f * (1.0f + Random.nextFloat())),
+              0.5f * Random.nextFloat())))
+        } else {
+          Some(new Sphere(center, 0.2f, new Dielectric(1.5f)))
+        }
+      } else {
+        None
+      }
+    }
+
+    val largeSpheres = Seq(
+      new Sphere(Vec3(0.0f, 1.0f, 0.0f), 1.0f, new Dielectric(1.5f)),
+      new Sphere(Vec3(-4.0f, 1.0f, 0.0f), 1.0f, new Lambertian(Vec3(0.4f, 0.2f, 0.1f))),
+      new Sphere(Vec3(4.0f, 1.0f, 0.0f), 1.0f, new Metal(Vec3(0.7f, 0.6f, 0.5f), 0.0f))
+    )
+
+    Seq(ground) ++ (smallSpheres.flatten) ++ largeSpheres
   }
 }
