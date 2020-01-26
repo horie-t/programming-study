@@ -253,7 +253,7 @@ object RayTracing extends App {
   val horizontal = Vec3(4.0f, 0.0f, 0.0f)
   val vertical = Vec3(0.0f, 2.0f, 0.0f)
   val origin = Vec3(0.0f, 0.0f, 0.0f)
-  val cam = new Camera(Vec3(-2.0f, 2.0f, 1.0f), Vec3(0.0f, 0.0f, -1.0f), Vec3(0.0f, 1.0f, 0.0f),
+  val cam = new Camera(Vec3(-0.2f, 0.75f, -0.7f), Vec3(0.0f, 0.0f, -1.0f), Vec3(0.0f, 1.0f, 0.0f),
     90.0f, nx.toFloat/ ny.toFloat)
 
   val R = math.cos(math.Pi.toFloat / 4.0f).toFloat
