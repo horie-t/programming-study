@@ -226,14 +226,17 @@ class Dielectric(val refIdx: Float) extends Material {
   }
 }
 
-class Camera(val vfov: Float, aspect: Float) {
+class Camera(val lookFrom: Vec3, val lookAt: Vec3, val vUp: Vec3, val vfov: Float, aspect: Float) {
   val theta = vfov * math.Pi.toFloat / 180.0f
   val halfHeight = math.tan(theta / 2.0f).toFloat
   val halfWidth = aspect * halfHeight
-  val origin = Vec3(0.0f, 0.0f, 0.0f)
-  val lowerLeftCorner = Vec3(-halfWidth, -halfHeight, -1.0f)
-  val horizontal = Vec3(2.0f * halfWidth, 0.0f, 0.0f)
-  val vertical = Vec3(0.0f, 2.0f * halfHeight, 0.0f)
+  val origin = lookFrom
+  val w = unitVector(lookFrom - lookAt)
+  val u = unitVector(cross(vUp, w))
+  val v = cross(w, u)
+  val lowerLeftCorner = origin - halfWidth * u - halfHeight * v - w
+  val horizontal = 2 * halfWidth * u
+  val vertical = 2 * halfHeight * v
 
   def getRay(u: Float, v: Float): Ray = Ray(origin, lowerLeftCorner + u * horizontal + v * vertical - origin)
 }
@@ -250,12 +253,16 @@ object RayTracing extends App {
   val horizontal = Vec3(4.0f, 0.0f, 0.0f)
   val vertical = Vec3(0.0f, 2.0f, 0.0f)
   val origin = Vec3(0.0f, 0.0f, 0.0f)
-  val cam = new Camera(90.0f, nx.toFloat/ ny.toFloat)
+  val cam = new Camera(Vec3(-2.0f, 2.0f, 1.0f), Vec3(0.0f, 0.0f, -1.0f), Vec3(0.0f, 1.0f, 0.0f),
+    90.0f, nx.toFloat/ ny.toFloat)
 
   val R = math.cos(math.Pi.toFloat / 4.0f).toFloat
   val world = Seq(
-    new Sphere(Vec3(-R, 0.0f, -1.0f), R, new Lambertian(Vec3(0.0f, 0.0f, 1.0f))),
-    new Sphere(Vec3( R, 0.0f, -1.0f), R, new Lambertian(Vec3(1.0f, 0.0f, 0.0f)))
+    new Sphere(Vec3(0.0f, 0.0f, -1.0f), 0.5f, new Lambertian(Vec3(0.1f, 0.2f, 0.5f))),
+    new Sphere(Vec3(0.0f, -100.5f, -1.0f), 100.0f, new Lambertian(Vec3(0.8f, 0.8f, 0.0f))),
+    new Sphere(Vec3(1.0f, 0.0f, -1.0f), 0.5f, new Metal(Vec3(0.8f, 0.6f, 0.2f), 0.3f)),
+    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), 0.5f, new Dielectric(1.5f)),
+    new Sphere(Vec3(-1.0f, 0.0f, -1.0f), -0.45f, new Dielectric(1.5f))
   )
 
   for (j <- (ny - 1) to 0 by -1;
