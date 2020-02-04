@@ -1,0 +1,15 @@
+@startuml
+together {
+        class SensorDataReader
+        class MapDrawer
+}
+SensorDataReader -down[hidden]- MapDrawer
+
+SensorDataReader : loadScan()
+MapDrawer : drawScanGp()
+
+SlamLauncher *-right- SensorDataReader
+SlamLauncher *-right- MapDrawer
+SlamLauncher : showScans()
+SlamLauncher : setFilename()
+@enduml

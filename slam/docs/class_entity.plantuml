@@ -1,0 +1,11 @@
+@startuml
+together {
+        class Pose2D
+        class LPoint2D        
+}
+Pose2D -down[hidden]- LPoint2D
+
+Scan2D *-right- Pose2D
+Scan2D o-- LPoint2D
+
+@enduml
