@@ -4,7 +4,14 @@ import scalafx.scene.canvas.Canvas
 import scalafx.scene.Scene
 import scalafx.scene.paint.Color
 
+import scala.io.Source
+
 object ScalaFXHelloCanvas extends JFXApp {
+  override def main(args: Array[String]): Unit = {
+    scanSource = Source.fromFile(args(0))
+    super.main(args)
+  }
+
   val canvas = new Canvas(700, 700)
   val gc = canvas.graphicsContext2D
 
@@ -20,6 +27,10 @@ object ScalaFXHelloCanvas extends JFXApp {
   gc.strokeLine(-6, -6, -6, 6)
   gc.strokeLine(-6, 6, 6, 6)
   gc.strokeLine(6, -6, 6, 6)
+
+  // ファイル読み込み
+  var scanSource: Source = _  // 初期化はmainで行う。
+  scanSource.getLines().foreach(println)
 
   stage = new PrimaryStage {
     title = "ScalaFX HelloCanvas"
