@@ -1,5 +1,7 @@
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
+import scalafx.Includes._
+import scalafx.animation.{AnimationTimer, Timeline}
 import scalafx.scene.canvas.Canvas
 import scalafx.scene.Scene
 import scalafx.scene.paint.Color
@@ -92,6 +94,7 @@ object ScalaFXHelloCanvas extends JFXApp {
     super.main(args)
   }
 
+  var scans: Seq[Scan2D] = _
   val canvas = new Canvas(700, 700)
   val gc = canvas.graphicsContext2D
 
@@ -100,19 +103,27 @@ object ScalaFXHelloCanvas extends JFXApp {
   gc.translate(7, 7)
   gc.transform(1, 0, 0, -1, 0, 0)
 
-  // 枠を描く
-  gc.stroke = Color.Black
-  gc.lineWidth = 0.02
-  gc.strokeLine(-6, -6, 6, -6)
-  gc.strokeLine(-6, -6, -6, 6)
-  gc.strokeLine(-6, 6, 6, 6)
-  gc.strokeLine(6, -6, 6, 6)
+  var timerOffset = 0L
+  val timer = AnimationTimer(t => {
+    gc.clearRect(-7, -7, 14, 14)
 
-  scans.head.laserPoints.map{point =>
-    gc.strokeRect(point.x, point.y, 0.02, 0.02)
-  }
+    // 枠を描く
+    gc.stroke = Color.Black
+    gc.lineWidth = 0.02
+    gc.strokeLine(-6, -6, 6, -6)
+    gc.strokeLine(-6, -6, -6, 6)
+    gc.strokeLine(-6, 6, 6, 6)
+    gc.strokeLine(6, -6, 6, 6)
 
-  var scans: Seq[Scan2D] = _
+    if (timerOffset == 0L) {
+      timerOffset = t
+    }
+    val scanNum = ((t - timerOffset) / 100000000).toInt % scans.length
+    scans(scanNum).laserPoints.map{point =>
+      gc.strokeRect(point.x, point.y, 0.02, 0.02)
+    }
+  })
+  timer.start()
 
   stage = new PrimaryStage {
     title = "ScalaFX HelloCanvas"
