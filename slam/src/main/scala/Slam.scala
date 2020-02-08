@@ -6,8 +6,46 @@ import scalafx.scene.paint.Color
 
 import scala.io.Source
 
+/**
+ * 1回のスキャンデータ
+ * @param sid
+ * @param laserPoints
+ * @param pose
+ */
 class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
 
+object Scan2D {
+  def readFile(path: String): Seq[Scan2D] = {
+    Source.fromFile(path).getLines().flatMap(line => {
+      val fields = line.split(" ").toList
+      if (fields.head == "LASERSCAN") {
+        val sid :: timeSec :: timeNSec :: countScanPoint :: rest = fields.drop(1)
+        if (rest.length >= countScanPoint.toInt * 2 + 3) {
+          val (scanPoints, pose) = rest.map(_.toDouble).splitAt(countScanPoint.toInt * 2) match {
+            case (scanData, poseAndTime) => {
+              (scanData.grouped(2), poseAndTime.take(3))
+            }
+          }
+          val laserPoints = scanPoints.flatMap(point => LaserPoint2D.calcPolar(sid.toInt, point(1), point(0))).toList
+          Some(new Scan2D(sid.toInt, laserPoints, new Pose2D(pose(0), pose(1), pose(2))))
+        } else {
+          // 途中でデータが途切れている
+          None
+        }
+      } else {
+        // スキャンデータ以外の行
+        None
+      }
+    }).toList
+  }
+}
+
+/**
+ * ポイントの測定データ
+ * @param sid
+ * @param x
+ * @param y
+ */
 class LaserPoint2D(val sid: Int, val x: Double, val y: Double) {
 
 }
@@ -48,28 +86,9 @@ class Pose2D(val x: Double, val y: Double, val angle: Double) {
   mat(0)(1) = - mat(1)(0)
 }
 
-object Scan2D {
-  def readFile(path: String): Seq[Scan2D] = {
-    Source.fromFile(path).getLines().flatMap(line => {
-      val fields = line.split(" ").toList
-      if (fields.head == "LASERSCAN") {
-        val sid :: timeSec :: timeNSec :: countScanPoint :: rest = fields.drop(1)
-        val (scanPoints, pose) = rest.map(_.toDouble).splitAt(countScanPoint.toInt * 2) match {
-          case (scanData, poseAndTime) => {
-            (scanData.grouped(2), poseAndTime.take(3))
-          }
-        }
-        val laserPoints = scanPoints.flatMap(point => LaserPoint2D.calcPolar(sid.toInt, point(1), point(0))).toList
-        Some(new Scan2D(sid.toInt, laserPoints, new Pose2D(pose(0), pose(1), pose(2))))
-      } else {
-        None
-      }
-    })
-  }.toList
-}
-
 object ScalaFXHelloCanvas extends JFXApp {
   override def main(args: Array[String]): Unit = {
+    scans = Scan2D.readFile(args(0))
     super.main(args)
   }
 
@@ -88,6 +107,12 @@ object ScalaFXHelloCanvas extends JFXApp {
   gc.strokeLine(-6, -6, -6, 6)
   gc.strokeLine(-6, 6, 6, 6)
   gc.strokeLine(6, -6, 6, 6)
+
+  scans.head.laserPoints.map{point =>
+    gc.strokeRect(point.x, point.y, 0.02, 0.02)
+  }
+
+  var scans: Seq[Scan2D] = _
 
   stage = new PrimaryStage {
     title = "ScalaFX HelloCanvas"
