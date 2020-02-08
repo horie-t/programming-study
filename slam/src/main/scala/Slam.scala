@@ -1,7 +1,6 @@
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
-import scalafx.Includes._
-import scalafx.animation.{AnimationTimer, Timeline}
+import scalafx.animation.AnimationTimer
 import scalafx.scene.canvas.Canvas
 import scalafx.scene.Scene
 import scalafx.scene.paint.Color
@@ -17,6 +16,7 @@ import scala.io.Source
 class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
 
 object Scan2D {
+  val angleOffset = 180
   def readFile(path: String): Seq[Scan2D] = {
     Source.fromFile(path).getLines().flatMap(line => {
       val fields = line.split(" ").toList
@@ -28,7 +28,7 @@ object Scan2D {
               (scanData.grouped(2), poseAndTime.take(3))
             }
           }
-          val laserPoints = scanPoints.flatMap(point => LaserPoint2D.calcPolar(sid.toInt, point(1), point(0))).toList
+          val laserPoints = scanPoints.flatMap(point => LaserPoint2D.calcPolar(sid.toInt, point(1), point(0) + angleOffset)).toList
           Some(new Scan2D(sid.toInt, laserPoints, new Pose2D(pose(0), pose(1), pose(2))))
         } else {
           // 途中でデータが途切れている
@@ -80,12 +80,18 @@ object LaserPoint2D {
   * @param angle 単位は度(°)
   */
 class Pose2D(val x: Double, val y: Double, val angle: Double) {
-  val angleRad = math.toRadians(angle)
+  val angleRad = angle
   val mat = Array.ofDim[Double](2, 2)
   mat(0)(0) = math.cos(angleRad)
   mat(1)(1) = math.cos(angleRad)
   mat(1)(0) = math.sin(angleRad)
   mat(0)(1) = - mat(1)(0)
+
+  def calcGlobalPoint(localPoint: LaserPoint2D): LaserPoint2D = {
+    val globalX = mat(0)(0) * localPoint.x + mat(0)(1) * localPoint.y + x
+    val globalY = mat(1)(0) * localPoint.x + mat(1)(1) * localPoint.y + y
+    new LaserPoint2D(localPoint.sid, globalX, globalY)
+  }
 }
 
 object ScalaFXHelloCanvas extends JFXApp {
@@ -95,16 +101,54 @@ object ScalaFXHelloCanvas extends JFXApp {
   }
 
   var scans: Seq[Scan2D] = _
-  val canvas = new Canvas(700, 700)
+  val canvas = new Canvas(900, 600)
   val gc = canvas.graphicsContext2D
 
   // 左下が負の象限になるようにする。
-  gc.scale(50, 50)
-  gc.translate(7, 7)
+  gc.scale(20, 20)
+  gc.translate(32.5, 32.5)
   gc.transform(1, 0, 0, -1, 0, 0)
+
+  // 枠を描く
+  gc.stroke = Color.Black
+  gc.lineWidth = 0.02
+  gc.strokeLine(-30, 5, 10, 5)
+  gc.strokeLine(-30, 5, -30, 30)
+  gc.strokeLine(-30, 30, 10, 30)
+  gc.strokeLine(10, 5, 10, 30)
 
   var timerOffset = 0L
   val timer = AnimationTimer(t => {
+    if (timerOffset == 0L) {
+      timerOffset = t
+    }
+
+    val scanNum = ((t - timerOffset) / 100000000).toInt
+    if (scanNum < scans.length) {
+      val scan = scans(scanNum)
+      if (scanNum % 10 == 0) {
+        val x = scan.pose.x
+        val y = scan.pose.y
+        val mat = scan.pose.mat
+        val length = 0.4
+        gc.strokeLine(x, y, x + length * mat(0)(0), y + length * mat(1)(0))
+        gc.strokeLine(x, y, x - length * mat(1)(0), y + length * mat(0)(0))
+      }
+      scan.laserPoints.map(scan.pose.calcGlobalPoint(_)).map {globalPoint =>
+        gc.strokeRect(globalPoint.x, globalPoint.y, 0.02, 0.02)
+      }
+    }
+  })
+  timer.start()
+
+  stage = new PrimaryStage {
+    title = "ScalaFX HelloCanvas"
+    scene = new Scene {
+      content = canvas
+    }
+  }
+
+  val scanAnimationTimer = AnimationTimer(t => {
     gc.clearRect(-7, -7, 14, 14)
 
     // 枠を描く
@@ -123,12 +167,4 @@ object ScalaFXHelloCanvas extends JFXApp {
       gc.strokeRect(point.x, point.y, 0.02, 0.02)
     }
   })
-  timer.start()
-
-  stage = new PrimaryStage {
-    title = "ScalaFX HelloCanvas"
-    scene = new Scene {
-      content = canvas
-    }
-  }
 }
