@@ -1,11 +1,30 @@
 @startuml
 together {
         class Pose2D
-        class LPoint2D        
+        class LaserPoint2D
 }
-Pose2D -down[hidden]- LPoint2D
+class Scan2D {
+sid : Int
+}
+note left of Scan2D : 1回のスキャンデータ
+
+class LaserPoint2D {
+sid: Int
+x : Double
+y : Double
+}
+note right : 1回の測定ポイント
+
+class Pose2D {
+x: Double
+y: Double
+mat: Array[Double][Double]
+}
+note right : ロボットの位置と姿勢\n(matはロボット座標系から地図座標系への変換用)
+
+Pose2D -down[hidden]- LaserPoint2D
 
 Scan2D *-right- Pose2D
-Scan2D o-- LPoint2D
+Scan2D o-- LaserPoint2D
 
 @enduml
