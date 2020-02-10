@@ -1,7 +1,7 @@
+import javafx.concurrent.Task
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.animation.AnimationTimer
-import scalafx.concurrent.Task
 import scalafx.scene.canvas.Canvas
 import scalafx.scene.Scene
 import scalafx.scene.paint.Color
@@ -127,9 +127,9 @@ object SlamScalaFx extends JFXApp {
 
   def animation(scans: Seq[Scan2D], scanNum: Int): Unit = {
     if (scans.nonEmpty) {
-      val task = new Task[Void](new javafx.concurrent.Task() {
+      val task = new Task[Unit]() {
         override protected def call: Unit = {
-          Thread.sleep(1000)
+          Thread.sleep(100)
         }
 
         override protected def succeeded(): Unit = {
@@ -142,14 +142,13 @@ object SlamScalaFx extends JFXApp {
             gc.strokeLine(x, y, x + length * mat(0)(0), y + length * mat(1)(0))
             gc.strokeLine(x, y, x - length * mat(1)(0), y + length * mat(0)(0))
           }
-          scan.laserPoints.map { point =>
+          for (point <- scan.laserPoints) {
             val globalPoint = scan.pose.calcGlobalPoint(point)
             gc.strokeRect(globalPoint.x, globalPoint.y, 0.02, 0.02)
-
-            animation(scans.tail, scanNum + 1)
           }
+          animation(scans.tail, scanNum + 1)
         }
-      }) {}
+      }
       new Thread(task).start()
     }
   }
