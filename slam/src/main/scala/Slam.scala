@@ -1,6 +1,7 @@
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
 import scalafx.animation.AnimationTimer
+import scalafx.concurrent.Task
 import scalafx.scene.canvas.Canvas
 import scalafx.scene.Scene
 import scalafx.scene.paint.Color
@@ -117,7 +118,49 @@ object SlamScalaFx extends JFXApp {
   gc.strokeLine(-30, 30, 10, 30)
   gc.strokeLine(10, 5, 10, 30)
 
+  stage = new PrimaryStage {
+    title = "SLAM ScalaFX"
+    scene = new Scene {
+      content = canvas
+    }
+  }
+
+  def animation(scans: Seq[Scan2D], scanNum: Int): Unit = {
+    if (scans.nonEmpty) {
+      val task = new Task[Void](new javafx.concurrent.Task() {
+        override protected def call: Unit = {
+          Thread.sleep(1000)
+        }
+
+        override protected def succeeded(): Unit = {
+          val scan = scans.head
+          if (scanNum % 10 == 0) {
+            val x = scan.pose.x
+            val y = scan.pose.y
+            val mat = scan.pose.mat
+            val length = 0.4
+            gc.strokeLine(x, y, x + length * mat(0)(0), y + length * mat(1)(0))
+            gc.strokeLine(x, y, x - length * mat(1)(0), y + length * mat(0)(0))
+          }
+          scan.laserPoints.map { point =>
+            val globalPoint = scan.pose.calcGlobalPoint(point)
+            gc.strokeRect(globalPoint.x, globalPoint.y, 0.02, 0.02)
+
+            animation(scans.tail, scanNum + 1)
+          }
+        }
+      }) {}
+      new Thread(task).start()
+    }
+  }
+  animation(scans, 0)
+
+  /*
+   * アニメーションタイマー使用バージョン
+   */
   var timerOffset = 0L
+
+  // スキャンとオドメトリの表示
   val timer = AnimationTimer(t => {
     if (timerOffset == 0L) {
       timerOffset = t
@@ -139,15 +182,9 @@ object SlamScalaFx extends JFXApp {
       }
     }
   })
-  timer.start()
+//  timer.start()
 
-  stage = new PrimaryStage {
-    title = "ScalaFX HelloCanvas"
-    scene = new Scene {
-      content = canvas
-    }
-  }
-
+  // スキャン結果のみ表示
   val scanAnimationTimer = AnimationTimer(t => {
     gc.clearRect(-7, -7, 14, 14)
 
