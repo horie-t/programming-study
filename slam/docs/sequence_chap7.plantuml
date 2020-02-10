@@ -1,0 +1,26 @@
+@startuml
+main -> SlamLauncher : run
+loop
+  SlamLauncher -> SensorDataReader : loadScan
+  SlamLauncher <-- SensorDataReader : scan
+
+  SlamLauncher -> SlamFrontEnd : process(scan)
+  SlamFrontEnd -> ScanMatcher2D : matchScan(scan)
+  ScanMatcher2D -> RefScanMakerBS : makeRefScan()
+  ScanMatcher2D <-- RefScanMakerBS : refScan
+  ScanMatcher2D -> PoseEstimatorICP : estimatePose(predPose)
+  loop
+    PoseEstimatorICP -> DataAssociatorLS : findCorrespondence(curScan)
+    PoseEstimatorICP <-- DataAssociatorLS :
+    PoseEstimatorICP -> PoseOptimizerSD : optimizePose(pose)
+    PoseEstimatorICP <-- PoseOptimizerSD : newPose
+  end
+  ScanMatcher2D <-- PoseEstimatorICP : estPose
+  ScanMatcher2D -> ScanMatcher2D : growMap(curScan, estPose)
+  SlamFrontEnd <-- ScanMatcher2D
+  SlamLauncher <-- SlamFrontEnd
+
+  SlamLauncher -> MapDrawer : drawMapGp
+end
+main <-- SlamLauncher
+@enduml
