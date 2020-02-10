@@ -94,7 +94,7 @@ class Pose2D(val x: Double, val y: Double, val angle: Double) {
   }
 }
 
-object ScalaFXHelloCanvas extends JFXApp {
+object SlamScalaFx extends JFXApp {
   override def main(args: Array[String]): Unit = {
     scans = Scan2D.readFile(args(0))
     super.main(args)
