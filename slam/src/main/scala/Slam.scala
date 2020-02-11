@@ -157,33 +157,38 @@ object SlamScalaFx extends JFXApp {
       content = canvas
     }
   }
+  drawScan(scans.head)
+  animation(scans.tail, scans.head)
 
-  def animation(scans: Seq[Scan2D], scanNum: Int): Unit = {
+  def animation(scans: Seq[Scan2D], referenceScan: Scan2D): Unit = {
     if (scans.nonEmpty) {
-      val task = new Task[Unit]() {
-        override protected def call: Unit = {
+      val task = new Task[Scan2D]() {
+        override protected def call: Scan2D = {
           Thread.sleep(100)
-        }
-
-        override protected def succeeded(): Unit = {
-          val scan = scans.head
-          if (scanNum % 10 == 0) {
-            val x = scan.pose.point.x
-            val y = scan.pose.point.y
-            val length = 0.4
-            val mat = scan.pose.mat
-            gc.strokeLine(x, y, x + length * mat(0, 0), y + length * mat(1, 0))
-            gc.strokeLine(x, y, x - length * mat(1, 0), y + length * mat(0, 0))
-          }
-          for (point <- scan.laserPoints) {
-            val globalPoint = scan.pose.calcGlobalPoint(point).point
-            gc.strokeRect(globalPoint.x, globalPoint.y, 0.02, 0.02)
-          }
-          animation(scans.tail, scanNum + 1)
+          scans.head
         }
       }
+      task.setOnSucceeded( _ => {
+          val scan = task.getValue
+          drawScan(scan)
+          animation(scans.tail, scan)
+      })
       new Thread(task).start()
     }
   }
-  animation(scans, 0)
+
+  def drawScan(scan: Scan2D): Unit = {
+    if (scan.sid % 10 == 0) {
+      val x = scan.pose.point.x
+      val y = scan.pose.point.y
+      val length = 0.4
+      val mat = scan.pose.mat
+      gc.strokeLine(x, y, x + length * mat(0, 0), y + length * mat(1, 0))
+      gc.strokeLine(x, y, x - length * mat(1, 0), y + length * mat(0, 0))
+    }
+    for (point <- scan.laserPoints) {
+      val globalPoint = scan.pose.calcGlobalPoint(point).point
+      gc.strokeRect(globalPoint.x, globalPoint.y, 0.02, 0.02)
+    }
+  }
 }
