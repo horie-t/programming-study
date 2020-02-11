@@ -1,12 +1,48 @@
 import javafx.concurrent.Task
 import scalafx.application.JFXApp
 import scalafx.application.JFXApp.PrimaryStage
-import scalafx.animation.AnimationTimer
 import scalafx.scene.canvas.Canvas
 import scalafx.scene.Scene
 import scalafx.scene.paint.Color
 
 import scala.io.Source
+
+/**
+ * 2次元ベクトル
+ * @param x
+ * @param y
+ */
+class Vec2(val x: Double, val y: Double) {
+  def +(v2: Vec2): Vec2 = Vec2(x + v2.x, y + v2.y)
+  def -(v2: Vec2): Vec2 = Vec2(x - v2.x, y - v2.y)
+
+  def *(v2: Vec2): Double = x * v2.x + y * v2.y
+
+  def length(): Double = math.sqrt(x * x + y * y)
+}
+
+object Vec2 {
+  def apply(x: Double, y: Double): Vec2 = new Vec2(x, y)
+}
+
+/**
+ * 2x2行列
+ * @param m00
+ * @param m01
+ * @param m10
+ * @param m11
+ */
+class Mat2(val m00: Double, val m01: Double, val m10: Double, val m11: Double) {
+  val mat = Array(Array(m00, m01), Array(m10, m11))
+
+  def *(v: Vec2): Vec2 = Vec2(mat(0)(0) * v.x + mat(0)(1) * v.y, mat(1)(0) * v.x + mat(1)(1) * v.y)
+
+  def apply(row: Int, col: Int): Double = mat(row)(col)
+}
+
+object Mat2 {
+  def apply(m00: Double, m01: Double, m10: Double, m11: Double): Mat2 = new Mat2(m00, m01, m10, m11)
+}
 
 /**
  * 1回のスキャンデータ
@@ -29,8 +65,9 @@ object Scan2D {
               (scanData.grouped(2), poseAndTime.take(3))
             }
           }
-          val laserPoints = scanPoints.flatMap(point => LaserPoint2D.calcPolar(sid.toInt, point(1), point(0) + angleOffset)).toList
-          Some(new Scan2D(sid.toInt, laserPoints, new Pose2D(pose(0), pose(1), pose(2))))
+          val laserPoints = scanPoints.flatMap(point =>
+            LaserPoint2D.calcPolar(sid.toInt, point(1), point(0) + angleOffset)).toList
+          Some(new Scan2D(sid.toInt, laserPoints, new Pose2D(Vec2(pose(0), pose(1)), pose(2))))
         } else {
           // 途中でデータが途切れている
           None
@@ -46,16 +83,17 @@ object Scan2D {
 /**
  * ポイントの測定データ
  * @param sid
- * @param x
- * @param y
+ * @param point
  */
-class LaserPoint2D(val sid: Int, val x: Double, val y: Double) {
+class LaserPoint2D(val sid: Int, val point: Vec2) {
 
 }
 
 object LaserPoint2D {
   val maxDistance = 6.0
   val minDistance = 0.1
+
+  def apply(sid: Int, point: Vec2): LaserPoint2D = new LaserPoint2D(sid, point)
 
   /**
     *
@@ -67,7 +105,7 @@ object LaserPoint2D {
   def calcPolar(sid: Int, distance: Double, angle: Double): Option[LaserPoint2D] = {
     if (minDistance <= distance && distance <= maxDistance) {
       val angleRad = math.toRadians(angle)
-      Some(new LaserPoint2D(sid, distance * math.cos(angleRad), distance * math.sin(angleRad)))
+      Some(LaserPoint2D(sid, Vec2(distance * math.cos(angleRad), distance * math.sin(angleRad))))
     } else {
       None
     }
@@ -76,22 +114,17 @@ object LaserPoint2D {
 
 /**
   * ロボットの姿勢データ
-  * @param x
-  * @param y
-  * @param angle 単位は度(°)
+  * @param point
+  * @param angleRad 単位はラジアン
   */
-class Pose2D(val x: Double, val y: Double, val angle: Double) {
-  val angleRad = angle
-  val mat = Array.ofDim[Double](2, 2)
-  mat(0)(0) = math.cos(angleRad)
-  mat(1)(1) = math.cos(angleRad)
-  mat(1)(0) = math.sin(angleRad)
-  mat(0)(1) = - mat(1)(0)
+class Pose2D(val point: Vec2, val angleRad: Double) {
+  val mat = Mat2(
+    math.cos(angleRad), -math.sin(angleRad),
+    math.sin(angleRad), math.cos(angleRad)
+  )
 
   def calcGlobalPoint(localPoint: LaserPoint2D): LaserPoint2D = {
-    val globalX = mat(0)(0) * localPoint.x + mat(0)(1) * localPoint.y + x
-    val globalY = mat(1)(0) * localPoint.x + mat(1)(1) * localPoint.y + y
-    new LaserPoint2D(localPoint.sid, globalX, globalY)
+    LaserPoint2D(localPoint.sid, mat * localPoint.point + point)
   }
 }
 
@@ -135,15 +168,15 @@ object SlamScalaFx extends JFXApp {
         override protected def succeeded(): Unit = {
           val scan = scans.head
           if (scanNum % 10 == 0) {
-            val x = scan.pose.x
-            val y = scan.pose.y
-            val mat = scan.pose.mat
+            val x = scan.pose.point.x
+            val y = scan.pose.point.y
             val length = 0.4
-            gc.strokeLine(x, y, x + length * mat(0)(0), y + length * mat(1)(0))
-            gc.strokeLine(x, y, x - length * mat(1)(0), y + length * mat(0)(0))
+            val mat = scan.pose.mat
+            gc.strokeLine(x, y, x + length * mat(0, 0), y + length * mat(1, 0))
+            gc.strokeLine(x, y, x - length * mat(1, 0), y + length * mat(0, 0))
           }
           for (point <- scan.laserPoints) {
-            val globalPoint = scan.pose.calcGlobalPoint(point)
+            val globalPoint = scan.pose.calcGlobalPoint(point).point
             gc.strokeRect(globalPoint.x, globalPoint.y, 0.02, 0.02)
           }
           animation(scans.tail, scanNum + 1)
