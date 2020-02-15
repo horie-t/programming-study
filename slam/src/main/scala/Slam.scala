@@ -19,6 +19,18 @@ class Vec2(val x: Double, val y: Double) {
   def *(v2: Vec2): Double = x * v2.x + y * v2.y
 
   def length(): Double = math.sqrt(x * x + y * y)
+  def squared_length() = x * x + y * y
+
+  def distance(v2: Vec2) = {
+    val dx = v2.x - x
+    val dy = v2.y - y
+    math.sqrt(dx * dx + dy * dy)
+  }
+  def squared_distance(v2: Vec2) = {
+    val dx = v2.x - x
+    val dy = v2.y - y
+    dx * dx + dy * dy
+  }
 }
 
 object Vec2 {
@@ -35,7 +47,18 @@ object Vec2 {
 class Mat2(val m00: Double, val m01: Double, val m10: Double, val m11: Double) {
   val mat = Array(Array(m00, m01), Array(m10, m11))
 
+  /**
+   * ドット積
+   * @param v
+   * @return
+   */
   def *(v: Vec2): Vec2 = Vec2(mat(0)(0) * v.x + mat(0)(1) * v.y, mat(1)(0) * v.x + mat(1)(1) * v.y)
+
+  /**
+   * 転置行列
+   * @return
+   */
+  def t: Mat2 = Mat2(mat(0)(0), mat(1)(0), mat(0)(1), mat(1)(1))
 
   def apply(row: Int, col: Int): Double = mat(row)(col)
 }
@@ -123,9 +146,41 @@ class Pose2D(val point: Vec2, val angleRad: Double) {
     math.sin(angleRad), math.cos(angleRad)
   )
 
+  def -(pose2: Pose2D): Pose2D = {
+    val diffPoint = pose2.mat.t * (point - pose2.point)
+    val diffAngle = angleRad - pose2.angleRad
+    Pose2D(diffPoint,
+      if (diffAngle < -math.Pi) {
+        diffAngle + 2 * math.Pi
+      } else if (diffAngle >= math.Pi) {
+        diffAngle - 2 * math.Pi
+      } else {
+        diffAngle
+      }
+    )
+  }
+
+  def +(pose2: Pose2D): Pose2D = {
+    val diffPoint = pose2.mat * point + pose2.point
+    val diffAngle = angleRad + pose2.angleRad
+    Pose2D(diffPoint,
+      if (diffAngle < -math.Pi) {
+        diffAngle + 2 * math.Pi
+      } else if (diffAngle >= math.Pi) {
+        diffAngle - 2 * math.Pi
+      } else {
+        diffAngle
+      }
+    )
+  }
+
   def calcGlobalPoint(localPoint: LaserPoint2D): LaserPoint2D = {
     LaserPoint2D(localPoint.sid, mat * localPoint.point + point)
   }
+}
+
+object Pose2D {
+  def apply(point: Vec2, angleRad: Double): Pose2D = new Pose2D(point, angleRad)
 }
 
 object SlamScalaFx extends JFXApp {
@@ -158,20 +213,130 @@ object SlamScalaFx extends JFXApp {
     }
   }
   drawScan(scans.head)
-  animation(scans.tail, scans.head)
+  animation(scans.tail, scans.head, scans.head.pose)
 
-  def animation(scans: Seq[Scan2D], referenceScan: Scan2D): Unit = {
+  def animation(scans: Seq[Scan2D], lastScan: Scan2D, lastPose: Pose2D): Unit = {
     if (scans.nonEmpty) {
       val task = new Task[Scan2D]() {
         override protected def call: Scan2D = {
           Thread.sleep(100)
-          scans.head
+          val currentScan = scans.head
+          val referenceScanGlobal = new Scan2D(lastScan.sid, lastScan.laserPoints.map(lastPose.calcGlobalPoint), lastPose)
+
+          // オドメトリの差分から現在の位置を推定
+          val oddMotion = currentScan.pose - lastScan.pose
+          val predicatePose = lastPose + oddMotion
+          val estimatedPose = estimatePose(predicatePose, currentScan, referenceScanGlobal)
+
+          currentScan
+        }
+
+        /**
+         * 位置・姿勢推定
+         * @param poseIni 初期推定値
+         * @param currentScan
+         * @param referenceScanGlobal
+         * @return
+         */
+        def estimatePose(poseIni: Pose2D, currentScan: Scan2D, referenceScanGlobal: Scan2D): Option[Pose2D] = {
+          val costThreshold = 1.0            // コスト閾値(これ以上のコストしか求められない場合は失敗)
+          val costDiffThreshold = 0.000001   // 繰り返してもこれ以下ならコスト計算終了
+          val repeatMax = 100                // 繰り返しの上限
+
+          /**
+           *
+           * @param posePre 前回推定値
+           * @param poseMin
+           * @param costMin
+           * @param count
+           * @return
+           */
+          def itr(posePre: Pose2D, poseMin: Pose2D, costMin: Double, count: Int): Option[Pose2D] = {
+            if (count >= repeatMax) {
+              // 振動対策(いくら繰り返しても収束しなかった)
+              if (costMin < costThreshold) {
+                Some(poseMin)  // 計算を打ち切り
+              } else {
+                None           // 見つからなかった
+              }
+            } else {
+              // 前回推定値から地図座標系での今回スキャンのポイントを算出し
+              // 前回と今回のスキャンのマッチング
+              val matchPointTuples = currentScan.laserPoints.flatMap { curPoint =>
+                val curPointGlobal = posePre.calcGlobalPoint(curPoint)
+                val closestPoint = referenceScanGlobal.laserPoints.minBy(_.point.squared_distance(curPointGlobal.point))
+                if (closestPoint.point.distance(curPointGlobal.point) < 0.2) {
+                  Some((curPoint, closestPoint))
+                } else {
+                  None
+                }
+              }.toList
+
+              val (optimisedPose, cost) = optimisePose(posePre, matchPointTuples)
+              if (math.abs(cost - costMin) < costDiffThreshold) {
+                if (cost < costThreshold) {
+                  Some(optimisedPose)    // 見つかった
+                } else {
+                  None                   // 不適切な局所解に陥った。
+                }
+              } else {
+                if (cost < costMin) {
+                  itr(optimisedPose, optimisedPose, cost, count + 1)
+                } else {
+                  itr(optimisedPose, poseMin, costMin, count + 1)
+                }
+              }
+            }
+          }
+
+          itr(poseIni, poseIni, Double.MaxValue, 0)
+        }
+
+        /**
+         * マッチしたスキャンから位置を推定
+         * @param poseIni
+         * @param matchPointTuples　マッチした(現在スキャン点(ローカル), 参照点(グローバル))のシーケンス。
+         * @return
+         */
+        def optimisePose(poseIni: Pose2D, matchPointTuples: Seq[(LaserPoint2D, LaserPoint2D)]): (Pose2D, Double) = {
+          def calcCost(pose: Pose2D): Double = {
+            matchPointTuples.map { tuple =>
+              val (curPoint, refPoint) = tuple
+              pose.calcGlobalPoint(curPoint).point.squared_distance(refPoint.point)
+            }.sum
+          }
+
+          val costDiffThreshold = 0.000001
+          val diffDistance = 0.00001
+          val diffAngle = 0.00001
+
+          val stepCoEff = 0.00001
+
+          def itr(posePrev: Pose2D, costPrev: Double, poseMin: Pose2D, costMin: Double): (Pose2D, Double) = {
+            val dEtx = (calcCost(Pose2D(posePrev.point + Vec2(diffDistance, 0), posePrev.angleRad)) - costPrev) / diffDistance
+            val dEty = (calcCost(Pose2D(posePrev.point + Vec2(0, diffDistance), posePrev.angleRad)) - costPrev) / diffDistance
+            val dEth = (calcCost(Pose2D(posePrev.point, posePrev.angleRad + diffAngle)) - costPrev) / diffAngle
+
+            val pose = Pose2D(posePrev.point + Vec2(-dEtx / stepCoEff, -dEty / stepCoEff), posePrev.angleRad -dEth / stepCoEff)
+            val cost = calcCost(pose)
+            if (math.abs(cost - costPrev) < costDiffThreshold) {
+              (pose, cost)
+            } else {
+              if (cost < costMin) {
+                itr(pose, cost, pose, cost)
+              } else {
+                itr(pose, cost, poseMin, costMin)
+              }
+            }
+          }
+
+          itr(poseIni, calcCost(poseIni), poseIni, Double.MaxValue)
         }
       }
       task.setOnSucceeded( _ => {
           val scan = task.getValue
           drawScan(scan)
-          animation(scans.tail, scan)
+          animation(scans.tail, scans.head, scan.pose)
       })
       new Thread(task).start()
     }
