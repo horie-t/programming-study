@@ -147,35 +147,25 @@ class Pose2D(val point: Vec2, val angleRad: Double) {
   )
 
   def -(pose2: Pose2D): Pose2D = {
-    val diffPoint = pose2.mat.t * (point - pose2.point)
-    val diffAngle = angleRad - pose2.angleRad
-    Pose2D(diffPoint,
-      if (diffAngle < -math.Pi) {
-        diffAngle + 2 * math.Pi
-      } else if (diffAngle >= math.Pi) {
-        diffAngle - 2 * math.Pi
-      } else {
-        diffAngle
-      }
-    )
+    Pose2D(point - pose2.point, normalizeAngle(angleRad - pose2.angleRad))
   }
 
   def +(pose2: Pose2D): Pose2D = {
-    val diffPoint = pose2.mat * point + pose2.point
-    val diffAngle = angleRad + pose2.angleRad
-    Pose2D(diffPoint,
-      if (diffAngle < -math.Pi) {
-        diffAngle + 2 * math.Pi
-      } else if (diffAngle >= math.Pi) {
-        diffAngle - 2 * math.Pi
-      } else {
-        diffAngle
-      }
-    )
+    Pose2D(point + pose2.point, normalizeAngle(angleRad + pose2.angleRad))
   }
 
   def calcGlobalPoint(localPoint: LaserPoint2D): LaserPoint2D = {
     LaserPoint2D(localPoint.sid, mat * localPoint.point + point)
+  }
+
+  private def normalizeAngle(angle: Double): Double = {
+    if (angle < -math.Pi) {
+      angle + 2 * math.Pi
+    } else if (angle >= math.Pi) {
+      angle - 2 * math.Pi
+    } else {
+      angle
+    }
   }
 }
 
@@ -226,9 +216,13 @@ object SlamScalaFx extends JFXApp {
           // オドメトリの差分から現在の位置を推定
           val oddMotion = currentScan.pose - lastScan.pose
           val predicatePose = lastPose + oddMotion
-          val estimatedPose = estimatePose(predicatePose, currentScan, referenceScanGlobal)
-
-          currentScan
+          estimatePose(predicatePose, currentScan, referenceScanGlobal) match {
+            case Some(estimatedPose) =>
+              new Scan2D(currentScan.sid, currentScan.laserPoints, estimatedPose)
+            case None => {
+              new Scan2D(currentScan.sid, currentScan.laserPoints, predicatePose)
+            }
+          }
         }
 
         /**
@@ -317,7 +311,7 @@ object SlamScalaFx extends JFXApp {
             val dEty = (calcCost(Pose2D(posePrev.point + Vec2(0, diffDistance), posePrev.angleRad)) - costPrev) / diffDistance
             val dEth = (calcCost(Pose2D(posePrev.point, posePrev.angleRad + diffAngle)) - costPrev) / diffAngle
 
-            val pose = Pose2D(posePrev.point + Vec2(-dEtx / stepCoEff, -dEty / stepCoEff), posePrev.angleRad -dEth / stepCoEff)
+            val pose = Pose2D(posePrev.point + Vec2(-dEtx * stepCoEff, -dEty * stepCoEff), posePrev.angleRad -dEth * stepCoEff)
             val cost = calcCost(pose)
             if (math.abs(cost - costPrev) < costDiffThreshold) {
               (pose, cost)
