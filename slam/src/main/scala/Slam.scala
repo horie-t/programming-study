@@ -202,20 +202,22 @@ object SlamScalaFx extends JFXApp {
       content = canvas
     }
   }
-  drawScan(scans.head)
-  animation(scans.tail, scans.head, scans.head.pose)
+  val currentScan = scans.head
+  drawScan(currentScan)
+  val referenceScan = new Scan2D(currentScan.sid,
+    currentScan.laserPoints.map(currentScan.pose.calcGlobalPoint), currentScan.pose)
+  animation(scans.tail, referenceScan, currentScan.pose)
 
-  def animation(scans: Seq[Scan2D], lastScan: Scan2D, lastPose: Pose2D): Unit = {
+  def animation(scans: Seq[Scan2D], referenceScanGlobal: Scan2D, lastScanPose: Pose2D): Unit = {
     if (scans.nonEmpty) {
       val task = new Task[Scan2D]() {
         override protected def call: Scan2D = {
           Thread.sleep(100)
           val currentScan = scans.head
-          val referenceScanGlobal = new Scan2D(lastScan.sid, lastScan.laserPoints.map(lastPose.calcGlobalPoint), lastPose)
 
           // オドメトリの差分から現在の位置を推定
-          val oddMotion = currentScan.pose - lastScan.pose
-          val predicatePose = lastPose + oddMotion
+          val oddMotion = currentScan.pose - lastScanPose
+          val predicatePose = referenceScanGlobal.pose + oddMotion
           estimatePose(predicatePose, currentScan, referenceScanGlobal) match {
             case Some(estimatedPose) =>
               new Scan2D(currentScan.sid, currentScan.laserPoints, estimatedPose)
@@ -247,6 +249,7 @@ object SlamScalaFx extends JFXApp {
            */
           def itr(posePre: Pose2D, poseMin: Pose2D, costMin: Double, count: Int): Option[Pose2D] = {
             if (count >= repeatMax) {
+              println("abort")
               // 振動対策(いくら繰り返しても収束しなかった)
               if (costMin < costThreshold) {
                 Some(poseMin)  // 計算を打ち切り
@@ -269,8 +272,10 @@ object SlamScalaFx extends JFXApp {
               val (optimisedPose, cost) = optimisePose(posePre, matchPointTuples)
               if (math.abs(cost - costMin) < costDiffThreshold) {
                 if (cost < costThreshold) {
+                  println("found match")
                   Some(optimisedPose)    // 見つかった
                 } else {
+                  println("found local")
                   None                   // 不適切な局所解に陥った。
                 }
               } else {
@@ -297,7 +302,7 @@ object SlamScalaFx extends JFXApp {
             matchPointTuples.map { tuple =>
               val (curPoint, refPoint) = tuple
               pose.calcGlobalPoint(curPoint).point.squared_distance(refPoint.point)
-            }.sum
+            }.sum * 10
           }
 
           val costDiffThreshold = 0.000001
@@ -328,9 +333,10 @@ object SlamScalaFx extends JFXApp {
         }
       }
       task.setOnSucceeded( _ => {
-          val scan = task.getValue
-          drawScan(scan)
-          animation(scans.tail, scans.head, scan.pose)
+        val scan = task.getValue
+        drawScan(scan)
+        val scanPrev = scans.head
+        animation(scans.tail, scan, scanPrev.pose)
       })
       new Thread(task).start()
     }
