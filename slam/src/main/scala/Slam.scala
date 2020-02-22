@@ -216,25 +216,36 @@ object Slam extends JFXApp {
     gc.strokeLine(-5, i, -4.8, i)
   }
 
-  // 自己位置を描画
-  def animation(scans: Seq[Scan2D]): Unit = {
+  val currentScan = scans.head
+  drawScan(currentScan)
+  val referenceScan = new Scan2D(currentScan.sid,
+    currentScan.laserPoints.map(currentScan.pose.calcGlobalPoint), currentScan.pose)
+  animation(scans.tail, referenceScan, currentScan.pose)
+
+  // 地図を描画
+  def animation(scans: Seq[Scan2D], referenceScanGlobal: Scan2D, lastScanPose: Pose2D): Unit = {
     if (scans.nonEmpty) {
       val task = new Task[Scan2D]() {
         override protected def call: Scan2D = {
           Thread.sleep(100)
-          scans.head
+          val currentScan = scans.head
+
+          // オドメトリの差分から現在の位置を推定
+          val oddMotion = currentScan.pose - lastScanPose
+          val predicatePose = referenceScanGlobal.pose + oddMotion
+          new Scan2D(currentScan.sid, currentScan.laserPoints, predicatePose)
         }
       }
       task.setOnSucceeded( _ => {
         val scan = task.getValue
         drawScan(scan)
-        animation(scans.tail)
+        val scanPrev = scans.head
+        animation(scans.tail, scan, scanPrev.pose)
       })
 
       new Thread(task).start()
     }
   }
-  animation(scans)
 
   stage = new PrimaryStage {
     title = "SLAM"
