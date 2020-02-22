@@ -83,7 +83,7 @@ class Pose2D(val point: Vec2, val angleRad: Double) {
   }
 
   def +(pose2: Pose2D): Pose2D = {
-    Pose2D(pose2.mat * (point + pose2.point), normalizeAngle(angleRad + pose2.angleRad))
+    Pose2D(point + mat * pose2.point, normalizeAngle(angleRad + pose2.angleRad))
   }
 
   def calcGlobalPoint(localPoint: LaserPoint2D): LaserPoint2D = {
