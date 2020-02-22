@@ -217,9 +217,9 @@ object Slam extends JFXApp {
   }
 
   val currentScan = scans.head
-  drawScan(currentScan)
   val referenceScan = new Scan2D(currentScan.sid,
     currentScan.laserPoints.map(currentScan.pose.calcGlobalPoint), currentScan.pose)
+  drawScan(referenceScan)
   animation(scans.tail, referenceScan, currentScan.pose)
 
   // 地図を描画
@@ -235,9 +235,9 @@ object Slam extends JFXApp {
           val predicatePose = referenceScanGlobal.pose + oddMotion
           estimatePose(predicatePose, currentScan, referenceScanGlobal) match {
             case Some(estimatedPose) =>
-              new Scan2D(currentScan.sid, currentScan.laserPoints, estimatedPose)
+              new Scan2D(currentScan.sid, currentScan.laserPoints.map(estimatedPose.calcGlobalPoint), estimatedPose)
             case None => {
-              new Scan2D(currentScan.sid, currentScan.laserPoints, predicatePose)
+              new Scan2D(currentScan.sid, currentScan.laserPoints.map(predicatePose.calcGlobalPoint), predicatePose)
             }
           }
         }
@@ -280,9 +280,8 @@ object Slam extends JFXApp {
       gc.strokeLine(x, y, x + length * mat(0, 0), y + length * mat(1, 0))
       gc.strokeLine(x, y, x - length * mat(1, 0), y + length * mat(0, 0))
     }
-    for (point <- scan.laserPoints) {
-      val globalPoint = scan.pose.calcGlobalPoint(point).point
-      gc.strokeRect(globalPoint.x, globalPoint.y, 0.02, 0.02)
+    for (laserPoint <- scan.laserPoints) {
+      gc.strokeRect(laserPoint.point.x, laserPoint.point.y, 0.02, 0.02)
     }
   }
 }
