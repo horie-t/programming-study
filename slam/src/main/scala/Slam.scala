@@ -233,7 +233,24 @@ object Slam extends JFXApp {
           // オドメトリの差分から現在の位置を推定
           val oddMotion = currentScan.pose - lastScanPose
           val predicatePose = referenceScanGlobal.pose + oddMotion
-          new Scan2D(currentScan.sid, currentScan.laserPoints, predicatePose)
+          estimatePose(predicatePose, currentScan, referenceScanGlobal) match {
+            case Some(estimatedPose) =>
+              new Scan2D(currentScan.sid, currentScan.laserPoints, estimatedPose)
+            case None => {
+              new Scan2D(currentScan.sid, currentScan.laserPoints, predicatePose)
+            }
+          }
+        }
+
+        /**
+         * 位置・姿勢推定
+         * @param poseIni 初期推定値
+         * @param currentScan
+         * @param referenceScanGlobal
+         * @return
+         */
+        def estimatePose(poseIni: Pose2D, currentScan: Scan2D, referenceScanGlobal: Scan2D): Option[Pose2D] = {
+          Some(poseIni)
         }
       }
       task.setOnSucceeded( _ => {
