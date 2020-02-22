@@ -250,6 +250,17 @@ object Slam extends JFXApp {
          * @return
          */
         def estimatePose(poseIni: Pose2D, currentScan: Scan2D, referenceScanGlobal: Scan2D): Option[Pose2D] = {
+          val matchPointTuples = currentScan.laserPoints.flatMap { curPoint =>
+            val curPointGlobal = poseIni.calcGlobalPoint(curPoint)
+            val closestPoint = referenceScanGlobal.laserPoints.minBy(_.point.squared_distance(curPointGlobal.point))
+            if (closestPoint.point.distance(curPointGlobal.point) < 0.2) {
+              Some((curPoint, closestPoint))
+            } else {
+              None
+            }
+          }.toList
+          println(s"estimatePose. matchPointNum: ${matchPointTuples.length}")
+
           Some(poseIni)
         }
       }
