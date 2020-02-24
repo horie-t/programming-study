@@ -13,19 +13,55 @@ import scala.io.Source
  * @param y
  */
 class Vec2(val x: Double, val y: Double) {
+  /**
+   * 和を返します。
+   * @param v2
+   * @return
+   */
   def +(v2: Vec2): Vec2 = Vec2(x + v2.x, y + v2.y)
+
+  /**
+   * 差を返します。
+   * @param v2
+   * @return
+   */
   def -(v2: Vec2): Vec2 = Vec2(x - v2.x, y - v2.y)
 
+  /**
+   * 内積を返します。
+   * @param v2
+   * @return
+   */
   def *(v2: Vec2): Double = x * v2.x + y * v2.y
 
+  /**
+   * 長さを返します。
+   * @return
+   */
   def length(): Double = math.sqrt(x * x + y * y)
+
+  /**
+   * 長さの自乗を返します。
+   * @return
+   */
   def squared_length() = x * x + y * y
 
+  /**
+   * 2点間の距離を返します。
+   * @param v2
+   * @return
+   */
   def distance(v2: Vec2) = {
     val dx = v2.x - x
     val dy = v2.y - y
     math.sqrt(dx * dx + dy * dy)
   }
+
+  /**
+   * 2点間の距離の自乗を返します。
+   * @param v2
+   * @return
+   */
   def squared_distance(v2: Vec2) = {
     val dx = v2.x - x
     val dy = v2.y - y
@@ -68,9 +104,9 @@ object Mat2 {
 }
 
 /**
- * ロボットの姿勢データ
- * @param point
- * @param angleRad 単位はラジアン
+ * ロボット位置ベクトル(2D座標と向きの角度の3次元ベクトル)
+ * @param point 位置ベクトル
+ * @param angleRad 向き(単位はラジアン)
  */
 class Pose2D(val point: Vec2, val angleRad: Double) {
   val mat = Mat2(
@@ -78,18 +114,38 @@ class Pose2D(val point: Vec2, val angleRad: Double) {
     math.sin(angleRad), math.cos(angleRad)
   )
 
+  /**
+   * 移動量を計算します。つまり、向きも含めた移動ベクトルを返す。
+   * @param pose2 元の位置ベクトル
+   * @return
+   */
   def -(pose2: Pose2D): Pose2D = {
     Pose2D(pose2.mat.t * (point - pose2.point), normalizeAngle(angleRad - pose2.angleRad))
   }
 
+  /**
+   * ロボットを移動させます。
+   * @param pose2 移動量
+   * @return
+   */
   def +(pose2: Pose2D): Pose2D = {
     Pose2D(point + mat * pose2.point, normalizeAngle(angleRad + pose2.angleRad))
   }
 
+  /**
+   * ロボットのローカル座標のスキャン・データから地図座標のポイントを算出します。
+   * @param localPoint
+   * @return
+   */
   def calcGlobalPoint(localPoint: LaserPoint2D): LaserPoint2D = {
     LaserPoint2D(localPoint.sid, mat * localPoint.point + point)
   }
 
+  /**
+   * 角度を-π〜πの間に正規化します。
+   * @param angle
+   * @return
+   */
   private def normalizeAngle(angle: Double): Double = {
     if (angle < -math.Pi) {
       angle + 2 * math.Pi
@@ -107,8 +163,8 @@ object Pose2D {
 
 /**
  * ポイントの測定データ
- * @param sid
- * @param point
+ * @param sid スキャンID
+ * @param point 位置座標
  */
 class LaserPoint2D(val sid: Int, val point: Vec2) {
 
@@ -121,10 +177,10 @@ object LaserPoint2D {
   def apply(sid: Int, point: Vec2): LaserPoint2D = new LaserPoint2D(sid, point)
 
   /**
-   *
-   * @param sid
-   * @param distance
-   * @param angle 単位は度(°)
+   * 極座標系の測定値から直行座標に変換します。
+   * @param sid スキャンID
+   * @param distance センサからの距離
+   * @param angle センサの向き(単位は度(°))
    * @return
    */
   def calcPolar(sid: Int, distance: Double, angle: Double): Option[LaserPoint2D] = {
@@ -140,8 +196,8 @@ object LaserPoint2D {
 /**
  * 1回のスキャンデータ
  * @param sid
- * @param laserPoints
- * @param pose
+ * @param laserPoints センサの測定値の並び。ローカル座標と地図座標の2パターンがある。
+ * @param pose ロボットの位置ベクトル
  */
 class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
 
