@@ -199,7 +199,150 @@ object LaserPoint2D {
  * @param laserPoints センサの測定値の並び。ローカル座標と地図座標の2パターンがある。
  * @param pose ロボットの位置ベクトル
  */
-class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
+class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D) {
+  /**
+   * スキャン・マッチングをします。
+   * @param referenceScanGlobal 参照スキャン
+   * @param lastScanPose 前回スキャン時のロボットの位置。
+   * @return マッチングの結果。laserPointsは地図座標系になります。
+   */
+  def matchScan(referenceScanGlobal: Scan2D, lastScanPose: Pose2D): Scan2D = {
+    val oddMotion = pose - lastScanPose
+    val predicatePose = referenceScanGlobal.pose + oddMotion
+    estimatePose(predicatePose, this, referenceScanGlobal) match {
+      case Some(estimatedPose) =>
+        new Scan2D(sid, laserPoints.map(estimatedPose.calcGlobalPoint), estimatedPose)
+      case None => {
+        new Scan2D(sid, laserPoints.map(predicatePose.calcGlobalPoint), predicatePose)
+      }
+    }
+  }
+
+  /**
+   * 位置・姿勢推定
+   * @param poseIni 初期推定値
+   * @param currentScan
+   * @param referenceScanGlobal
+   * @return
+   */
+  def estimatePose(poseIni: Pose2D, currentScan: Scan2D, referenceScanGlobal: Scan2D): Option[Pose2D] = {
+    /**
+     * イテレータ
+     * @param posePre 前回推定値
+     * @param costPrev 前回のコスト
+     * @param poseMin コスト最小のロボット推定位置
+     * @param costMin 最小のコスト
+     * @param count イテレーションの回数
+     * @return 推定位置
+     */
+    def itr(posePre: Pose2D, costPrev: Double, poseMin: Pose2D, costMin: Double, count: Int): Option[Pose2D] = {
+      val costThreshold = 1.0            // コスト閾値(これ以上のコストしか求められない場合は失敗)
+      val costDiffThreshold = 0.000001   // 繰り返してもこれ以下ならコスト計算終了
+      val repeatMax = 100                // 繰り返しの上限
+
+      if (count >= repeatMax) {
+        // 振動対策(いくら繰り返しても収束しなかった)
+        if (costMin < costThreshold) {
+          Some(poseMin)  // 計算を打ち切り
+        } else {
+          None           // 見つからなかった
+        }
+      } else {
+        // 前回推定値から地図座標系での今回スキャンのポイントを算出し
+        // 前回と今回のスキャンの測定点のマッチングする
+        val matchPointTuples = currentScan.laserPoints.flatMap { curPoint =>
+          val curPointGlobal = posePre.calcGlobalPoint(curPoint)
+          val closestPoint = referenceScanGlobal.laserPoints.minBy(_.point.squared_distance(curPointGlobal.point))
+          if (closestPoint.point.distance(curPointGlobal.point) < 0.2) {
+            Some((curPoint, closestPoint))
+          } else {
+            None
+          }
+        }.toList
+
+        // マッチングしたポイントの距離が最小になるロボット位置を最適化する。
+        val (optimisedPose, cost) = optimisePose(posePre, matchPointTuples)
+        if (math.abs(cost - costPrev) < costDiffThreshold) {
+          if (cost < costThreshold && matchPointTuples.length > 50) {
+            Some(optimisedPose)    // 見つかった
+          } else {
+            None                   // 不適切な局所解に陥った。
+          }
+        } else {
+          if (cost < costMin) {
+            itr(optimisedPose, cost, optimisedPose, cost, count + 1)
+          } else {
+            itr(optimisedPose, cost, poseMin, costMin, count + 1)
+          }
+        }
+      }
+    }
+
+    itr(poseIni, Double.MaxValue, poseIni, Double.MaxValue, 0)
+  }
+
+  /**
+   * マッチしたスキャンから位置を推定
+   * @param poseIni
+   * @param matchPointTuples　マッチした(現在スキャン点(ローカル), 参照点(グローバル))のシーケンス。
+   * @return
+   */
+  def optimisePose(poseIni: Pose2D, matchPointTuples: Seq[(LaserPoint2D, LaserPoint2D)]): (Pose2D, Double) = {
+    /**
+     * ロボットの推定位置でのスキャン・マッチの誤差(コスト)を計算します。
+     * @param pose ロボットの推定位置
+     * @return
+     */
+    def calcCost(pose: Pose2D): Double = {
+      matchPointTuples.map { tuple =>
+        val (curPoint, refPoint) = tuple
+        pose.calcGlobalPoint(curPoint).point.squared_distance(refPoint.point)
+      }.sum / matchPointTuples.length * 100
+    }
+
+    /**
+     * イテレータ
+     * @param posePrev 前回推定位置
+     * @param costPrev 前回のコスト
+     * @param poseMin 最小のコストの推定位置
+     * @param costMin 最小のコスト
+     * @return
+     */
+    def itr(posePrev: Pose2D, costPrev: Double, poseMin: Pose2D, costMin: Double): (Pose2D, Double) = {
+      /*
+       * 最急降下法で位置を推定します。
+       */
+      val diffDistance = 0.00001
+      val diffAngle = math.toRadians(0.00001)
+      val stepCoEff = 0.00001
+      val stepCoEffAngle = math.toRadians(0.00001)
+
+      // 各方向の傾きを計算
+      val dEtx = (calcCost(Pose2D(posePrev.point + Vec2(diffDistance, 0), posePrev.angleRad)) - costPrev) / diffDistance
+      val dEty = (calcCost(Pose2D(posePrev.point + Vec2(0, diffDistance), posePrev.angleRad)) - costPrev) / diffDistance
+      val dEth = (calcCost(Pose2D(posePrev.point, posePrev.angleRad + diffAngle)) - costPrev) / diffAngle
+
+      // 下り方向へ移動してみて、その場所でのコストを計算
+      val pose = Pose2D(posePrev.point + Vec2(-dEtx * stepCoEff, -dEty * stepCoEff), posePrev.angleRad - dEth * stepCoEffAngle)
+      val cost = calcCost(pose)
+
+      val costDiffThreshold = 0.000001
+      if (math.abs(cost - costPrev) < costDiffThreshold) {
+        // 前回との差が少なくなったので、計算終了
+        (poseMin, costMin)
+      } else {
+        if (cost < costMin) {
+          itr(pose, cost, pose, cost)
+        } else {
+          itr(pose, cost, poseMin, costMin)
+        }
+      }
+    }
+
+    val costIni = calcCost(poseIni)
+    itr(poseIni, costIni, poseIni, costIni)
+  }
+}
 
 object Scan2D {
   /**
@@ -284,123 +427,7 @@ object Slam extends JFXApp {
       val task = new Task[Scan2D]() {
         override protected def call: Scan2D = {
           Thread.sleep(100)
-          val currentScan = scans.head
-
-          // オドメトリの差分から現在の位置を推定
-          val oddMotion = currentScan.pose - lastScanPose
-          val predicatePose = referenceScanGlobal.pose + oddMotion
-          estimatePose(predicatePose, currentScan, referenceScanGlobal) match {
-            case Some(estimatedPose) =>
-              new Scan2D(currentScan.sid, currentScan.laserPoints.map(estimatedPose.calcGlobalPoint), estimatedPose)
-            case None => {
-              new Scan2D(currentScan.sid, currentScan.laserPoints.map(predicatePose.calcGlobalPoint), predicatePose)
-            }
-          }
-        }
-
-        /**
-         * 位置・姿勢推定
-         * @param poseIni 初期推定値
-         * @param currentScan
-         * @param referenceScanGlobal
-         * @return
-         */
-        def estimatePose(poseIni: Pose2D, currentScan: Scan2D, referenceScanGlobal: Scan2D): Option[Pose2D] = {
-          /**
-           *
-           * @param posePre 前回推定値
-           * @param poseMin
-           * @param costMin
-           * @param count
-           * @return
-           */
-          def itr(posePre: Pose2D, costPrev: Double, poseMin: Pose2D, costMin: Double, count: Int): Option[Pose2D] = {
-            val costThreshold = 1.0            // コスト閾値(これ以上のコストしか求められない場合は失敗)
-            val costDiffThreshold = 0.000001   // 繰り返してもこれ以下ならコスト計算終了
-            val repeatMax = 100                // 繰り返しの上限
-
-            if (count >= repeatMax) {
-              // 振動対策(いくら繰り返しても収束しなかった)
-              if (costMin < costThreshold) {
-                Some(poseMin)  // 計算を打ち切り
-              } else {
-                None           // 見つからなかった
-              }
-            } else {
-              // 前回推定値から地図座標系での今回スキャンのポイントを算出し
-              // 前回と今回のスキャンのマッチング
-              val matchPointTuples = currentScan.laserPoints.flatMap { curPoint =>
-                val curPointGlobal = posePre.calcGlobalPoint(curPoint)
-                val closestPoint = referenceScanGlobal.laserPoints.minBy(_.point.squared_distance(curPointGlobal.point))
-                if (closestPoint.point.distance(curPointGlobal.point) < 0.2) {
-                  Some((curPoint, closestPoint))
-                } else {
-                  None
-                }
-              }.toList
-
-              val (optimisedPose, cost) = optimisePose(posePre, matchPointTuples)
-              if (math.abs(cost - costPrev) < costDiffThreshold) {
-                if (cost < costThreshold && matchPointTuples.length > 50) {
-                  Some(optimisedPose)    // 見つかった
-                } else {
-                  None                   // 不適切な局所解に陥った。
-                }
-              } else {
-                if (cost < costMin) {
-                  itr(optimisedPose, cost, optimisedPose, cost, count + 1)
-                } else {
-                  itr(optimisedPose, cost, poseMin, costMin, count + 1)
-                }
-              }
-            }
-          }
-
-          itr(poseIni, Double.MaxValue, poseIni, Double.MaxValue, 0)
-        }
-
-
-        /**
-         * マッチしたスキャンから位置を推定
-         * @param poseIni
-         * @param matchPointTuples　マッチした(現在スキャン点(ローカル), 参照点(グローバル))のシーケンス。
-         * @return
-         */
-        def optimisePose(poseIni: Pose2D, matchPointTuples: Seq[(LaserPoint2D, LaserPoint2D)]): (Pose2D, Double) = {
-          def calcCost(pose: Pose2D): Double = {
-            matchPointTuples.map { tuple =>
-              val (curPoint, refPoint) = tuple
-              pose.calcGlobalPoint(curPoint).point.squared_distance(refPoint.point)
-            }.sum / matchPointTuples.length * 100
-          }
-
-          def itr(posePrev: Pose2D, costPrev: Double, poseMin: Pose2D, costMin: Double): (Pose2D, Double) = {
-            val diffDistance = 0.00001
-            val diffAngle = math.toRadians(0.00001)
-            val stepCoEff = 0.00001
-            val stepCoEffAngle = math.toRadians(0.00001)
-
-            val dEtx = (calcCost(Pose2D(posePrev.point + Vec2(diffDistance, 0), posePrev.angleRad)) - costPrev) / diffDistance
-            val dEty = (calcCost(Pose2D(posePrev.point + Vec2(0, diffDistance), posePrev.angleRad)) - costPrev) / diffDistance
-            val dEth = (calcCost(Pose2D(posePrev.point, posePrev.angleRad + diffAngle)) - costPrev) / diffAngle
-
-            val pose = Pose2D(posePrev.point + Vec2(-dEtx * stepCoEff, -dEty * stepCoEff), posePrev.angleRad - dEth * stepCoEffAngle)
-            val cost = calcCost(pose)
-
-            val costDiffThreshold = 0.000001
-            if (math.abs(cost - costPrev) < costDiffThreshold) {
-              (poseMin, costMin)
-            } else {
-              if (cost < costMin) {
-                itr(pose, cost, pose, cost)
-              } else {
-                itr(pose, cost, poseMin, costMin)
-              }
-            }
-          }
-
-          val costIni = calcCost(poseIni)
-          itr(poseIni, costIni, poseIni, costIni)
+          scans.head.matchScan(referenceScanGlobal, lastScanPose)
         }
       }
       task.setOnSucceeded( _ => {
