@@ -194,61 +194,6 @@ object LaserPoint2D {
       None
     }
   }
-
-  /**
-   * 測定点を格子毎に分割して、格子の代表点を計算して返します。
-   * @param pointGlobals
-   * @return
-   */
-  def calcRepresentativePoints(pointGlobals: Seq[LaserPoint2D]): Seq[LaserPoint2D] = {
-    val cellSideSize = 0.05 // 一つのマスの辺の長さ(5cm)
-    val gridSideSize = 80.0 // 格子の辺の長さ(80m)
-    val cellSideCount = (gridSideSize / cellSideSize).toInt // 1辺のマスの数
-
-    // 格子
-    val grid = Array.fill[ArrayBuffer[LaserPoint2D]](cellSideCount, cellSideCount) { new ArrayBuffer[LaserPoint2D]()}
-
-    /**
-     * マスのインデックスを返します。
-     *
-     * @param x 位置
-     * @return
-     */
-    def calcCellIndex(x: Double): Int = {
-      (x / cellSideSize).toInt + cellSideCount / 2
-    }
-
-    /**
-     * マスのインデックスが格子の内側かどうかを返します。
-     *
-     * @param cellIndex
-     * @return
-     */
-    def isInGrid(cellIndex: Int): Boolean = {
-      0 <= cellIndex && cellIndex < cellSideCount
-    }
-
-    // 測定点を格子に分割
-    for (pointGlobal <- pointGlobals) {
-      val (xIndex, yIndex) = (calcCellIndex(pointGlobal.point.x), calcCellIndex(pointGlobal.point.y))
-      if (isInGrid(xIndex) && isInGrid(yIndex)) {
-        grid(yIndex)(xIndex) += pointGlobal
-      }
-    }
-
-    val representativePoints = (for (row <- grid;
-         cell <- row)
-      yield {
-        if (cell.isEmpty) {
-          None
-        } else {
-          val pointAverage = (cell.map(_.point).reduce(_ + _)) / cell.length
-          Some(LaserPoint2D(-1, pointAverage))
-        }
-      }).toList.flatten
-
-    representativePoints
-  }
 }
 
 /**
@@ -440,6 +385,60 @@ object Scan2D {
   }
 }
 
+class PointCloudMap {
+  val cellSideSize = 0.05 // 一つのマスの辺の長さ(5cm)
+  val gridSideSize = 80.0 // 格子の辺の長さ(80m)
+  val cellSideCount = (gridSideSize / cellSideSize).toInt // 1辺のマスの数
+
+  // 格子
+  val grid = Array.fill[ArrayBuffer[LaserPoint2D]](cellSideCount, cellSideCount) { new ArrayBuffer[LaserPoint2D]()}
+
+  /**
+   * マスのインデックスを返します。
+   *
+   * @param x 位置
+   * @return
+   */
+  private def calcCellIndex(x: Double): Int = {
+    (x / cellSideSize).toInt + cellSideCount / 2
+  }
+
+  /**
+   * マスのインデックスが格子の内側かどうかを返します。
+   *
+   * @param cellIndex
+   * @return
+   */
+  private def isInGrid(cellIndex: Int): Boolean = {
+    0 <= cellIndex && cellIndex < cellSideCount
+  }
+
+  def addPoints(pointGlobals: Seq[LaserPoint2D]): Unit = {
+    // 測定点を格子に分割
+    for (pointGlobal <- pointGlobals) {
+      val (xIndex, yIndex) = (calcCellIndex(pointGlobal.point.x), calcCellIndex(pointGlobal.point.y))
+      if (isInGrid(xIndex) && isInGrid(yIndex)) {
+        grid(yIndex)(xIndex) += pointGlobal
+      }
+    }
+  }
+
+  def calcRepresentativePoints(): Seq[LaserPoint2D] = {
+    val representativePoints = (for (row <- grid;
+                                     cell <- row)
+      yield {
+        if (cell.isEmpty) {
+          None
+        } else {
+          val pointAverage = (cell.map(_.point).reduce(_ + _)) / cell.length
+          Some(LaserPoint2D(-1, pointAverage))
+        }
+      }).toList.flatten
+
+    representativePoints
+  }
+}
+
 object Slam extends JFXApp {
   override def main(args: Array[String]): Unit = {
     scans = Scan2D.readFile(args(0))
@@ -473,28 +472,32 @@ object Slam extends JFXApp {
     gc.strokeLine(-5, i, -4.8, i)
   }
 
+  val pointCloudMap = new PointCloudMap()
+
   val currentScan = scans.head
   val referenceScan = new Scan2D(currentScan.sid,
     currentScan.laserPoints.map(currentScan.pose.calcGlobalPoint), currentScan.pose)
   drawScan(referenceScan)
-  animation(scans.tail, referenceScan, currentScan.pose)
+  pointCloudMap.addPoints(currentScan.laserPoints.map(currentScan.pose.calcGlobalPoint))
+  animation(scans.tail, currentScan.pose, currentScan.pose)
 
   // 地図を描画
-  def animation(scans: Seq[Scan2D], allScanGlobal: Scan2D, lastScanPose: Pose2D): Unit = {
+  def animation(scans: Seq[Scan2D], lastPose: Pose2D, lastScanPose: Pose2D): Unit = {
     if (scans.nonEmpty) {
       val task = new Task[Scan2D]() {
         override protected def call: Scan2D = {
           Thread.sleep(100)
-          val repPoints = LaserPoint2D.calcRepresentativePoints(allScanGlobal.laserPoints)
-          scans.head.matchScan(new Scan2D(allScanGlobal.sid, repPoints, allScanGlobal.pose), lastScanPose)
+          val currentScan = scans.head
+          val repPoints = pointCloudMap.calcRepresentativePoints()
+          currentScan.matchScan(new Scan2D(currentScan.sid - 1, repPoints, lastPose), lastScanPose)
         }
       }
       task.setOnSucceeded( _ => {
         val scan = task.getValue
         drawScan(scan)
         val scanPrev = scans.head
-        val allScanGlobalNext = new Scan2D(scan.sid, allScanGlobal.laserPoints ++ scan.laserPoints, scan.pose)
-        animation(scans.tail, allScanGlobalNext, scanPrev.pose)
+        pointCloudMap.addPoints(scan.laserPoints)
+        animation(scans.tail, scan.pose, scanPrev.pose)
       })
 
       new Thread(task).start()
