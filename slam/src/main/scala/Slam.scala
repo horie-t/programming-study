@@ -447,29 +447,40 @@ object Slam extends JFXApp {
 
   var scans: Seq[Scan2D] = _
 
-  val canvas = new Canvas(800, 500)
+//  val canvas = new Canvas(800, 500)
+  val canvas = new Canvas(600, 600)
   val gc = canvas.graphicsContext2D
 
   // 左下が負の象限になるようにする。
   gc.scale(20, 20)
-  gc.transform(1, 0, 0, -1, 7.51, 7.51)  // 0.01は線の半分(これを足さないと線がボケる)
+//  gc.transform(1, 0, 0, -1, 7.51, 7.51)  // 0.01は線の半分(これを足さないと線がボケる)
+  gc.transform(1, 0, 0, -1, 12.51, 22.51)  // 0.01は線の半分(これを足さないと線がボケる)
 
   // 枠を描く
   gc.stroke = Color.Black
   gc.lineWidth = 0.02
-  gc.strokeLine(-5, -15, 30, -15)  // 下
-  gc.strokeLine(-5, -15, -5,   5)  // 左
-  gc.strokeLine(-5,   5, 30,   5)  // 上
-  gc.strokeLine(30, -15, 30,   5)  // 右
+
+//  val left = -5
+//  val right = 30
+//  val bottom = -15
+//  val top = 5
+  val left = -10
+  val right = 15
+  val bottom = -5
+  val top = 20
+  gc.strokeLine( left, bottom, right, bottom)  // 下
+  gc.strokeLine( left, bottom,  left,    top)  // 左
+  gc.strokeLine( left,    top, right,    top)  // 上
+  gc.strokeLine(right, bottom, right,    top)  // 右
 
   // 目盛りを描く
   // x軸
-  for (i <- 0 to 25 by 5) {
-    gc.strokeLine(i, -15, i, -14.8)
+  for (i <- left to right by 5) {
+    gc.strokeLine(i, bottom, i, bottom + 0.2)
   }
   // y軸
-  for (i <- -10 to 0 by 5) {
-    gc.strokeLine(-5, i, -4.8, i)
+  for (i <- bottom to top by 5) {
+    gc.strokeLine(left, i, left + 0.2, i)
   }
 
   val pointCloudMap = new PointCloudMap()
@@ -505,7 +516,7 @@ object Slam extends JFXApp {
   }
 
   stage = new PrimaryStage {
-    title = "SLAM"
+    title = "SLAM Hall Grid Representative Point"
     scene = new Scene {
       content = canvas
     }
