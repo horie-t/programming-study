@@ -16,6 +16,10 @@
 
 <img src="./docs/images/CorridorGridRepresentativePoint.png" width="400px" />
 
+スキャンを等間隔にする
+
+<img src="./docs/images/CorridorResampling.png" width="400px" />
+
 ## ホール
 
 オドメトリ
@@ -29,3 +33,8 @@
 点群を格子に分割して代表点でマッチング
 
 <img src="./docs/images/HallGridRepresentativePoint.png" width="400px" />
+
+スキャンを等間隔にする
+
+<img src="./docs/images/HallResampling.png" width="400px" />
+
