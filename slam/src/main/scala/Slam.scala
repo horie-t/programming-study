@@ -35,6 +35,7 @@ class Vec2(val x: Double, val y: Double) {
    */
   def *(v2: Vec2): Double = x * v2.x + y * v2.y
 
+  def *(n: Double): Vec2 = Vec2(x * n, y * n)
   def /(n: Double): Vec2 = Vec2(x / n, y / n)
 
   /**
@@ -203,6 +204,42 @@ object LaserPoint2D {
  * @param pose ロボットの位置ベクトル
  */
 class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D) {
+  def resamplePoints(): Scan2D = {
+    def findInterpolatePoint(currentPoint: LaserPoint2D, prevPoint: LaserPoint2D, accumulateDist: Double): Either[Double, (LaserPoint2D, Boolean)] = {
+      val dThresholdS = 0.05
+      val dThresholdL = 0.25
+
+      val diffVec = currentPoint.point - prevPoint.point
+      val distance = diffVec.length()
+      if (accumulateDist + distance < dThresholdS) {
+        Left(accumulateDist + distance)
+      } else if (accumulateDist + distance < dThresholdL) {
+        val ratio = (dThresholdS - accumulateDist) / distance
+        val point = diffVec * ratio + prevPoint.point
+        Right((LaserPoint2D(currentPoint.sid, point), true))
+      } else {
+        Right((currentPoint, false))
+      }
+    }
+
+    def itr(orgPoints: Seq[LaserPoint2D], prevPoint: LaserPoint2D, accumulateDist: Double, resamplePoints: List[LaserPoint2D]): Scan2D = {
+      if (orgPoints.isEmpty) {
+        new Scan2D(sid, resamplePoints.reverse, pose)
+      } else {
+        findInterpolatePoint(orgPoints.head, prevPoint, accumulateDist) match {
+          case Left(dist) => {
+            itr(orgPoints.tail, orgPoints.head, dist, resamplePoints)
+          }
+          case Right((lPoint, inserted)) => {
+            itr(if (inserted) orgPoints else orgPoints.tail, lPoint, 0.0, lPoint :: resamplePoints)
+          }
+        }
+      }
+    }
+
+    itr(laserPoints.tail, laserPoints.head, 0.0, laserPoints.head :: Nil)
+  }
+
   /**
    * スキャン・マッチングをします。
    * @param referenceScanGlobal 参照スキャン
@@ -500,7 +537,7 @@ object Slam extends JFXApp {
           Thread.sleep(100)
           val currentScan = scans.head
           val repPoints = pointCloudMap.calcRepresentativePoints()
-          currentScan.matchScan(new Scan2D(currentScan.sid - 1, repPoints, lastPose), lastScanPose)
+          currentScan.resamplePoints().matchScan(new Scan2D(currentScan.sid - 1, repPoints, lastPose), lastScanPose)
         }
       }
       task.setOnSucceeded( _ => {
@@ -516,7 +553,7 @@ object Slam extends JFXApp {
   }
 
   stage = new PrimaryStage {
-    title = "SLAM Hall Grid Representative Point"
+    title = "SLAM Hall Interpolate Scan Point"
     scene = new Scene {
       content = canvas
     }
