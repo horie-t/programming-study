@@ -20,6 +20,11 @@
 
 <img src="./docs/images/CorridorResampling.png" width="400px" />
 
+垂直距離をコスト関数にする
+
+<img src="./docs/images/CorridorPerpendicularDistance.png" width="400px" />
+
+
 ## ホール
 
 オドメトリ
@@ -37,4 +42,9 @@
 スキャンを等間隔にする
 
 <img src="./docs/images/HallResampling.png" width="400px" />
+
+垂直距離をコスト関数にする
+
+<img src="./docs/images/HallPerpendicularDistance.png" width="400px" />
+
 

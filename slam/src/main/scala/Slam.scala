@@ -71,6 +71,11 @@ class Vec2(val x: Double, val y: Double) {
     val dy = v2.y - y
     dx * dx + dy * dy
   }
+
+  def normalize(): Vec2 = {
+    val len = length()
+    Vec2(x / len, y / len)
+  }
 }
 
 object Vec2 {
@@ -142,7 +147,10 @@ class Pose2D(val point: Vec2, val angleRad: Double) {
    * @return
    */
   def calcGlobalPoint(localPoint: LaserPoint2D): LaserPoint2D = {
-    LaserPoint2D(localPoint.sid, mat * localPoint.point + point)
+    localPoint match {
+      case linePoint: LaserPoint2DLine => LaserPoint2DLine(linePoint.sid, mat * linePoint.point + point, mat * linePoint.normal)
+      case _ => LaserPoint2D(localPoint.sid, mat * localPoint.point + point)
+    }
   }
 
   /**
@@ -198,13 +206,72 @@ object LaserPoint2D {
 }
 
 /**
+ * 直線上のスキャン点
+ * @param sid スキャンID
+ * @param point 位置座標
+ * @param normal 法線ベクトル
+ */
+class LaserPoint2DLine(override val sid: Int, override val point: Vec2, val normal: Vec2) extends LaserPoint2D(sid, point) {
+  def this(laserPoint2D: LaserPoint2D, normal: Vec2) {
+    this(laserPoint2D.sid, laserPoint2D.point, normal)
+  }
+}
+
+object LaserPoint2DLine {
+  def apply(sid: Int, point: Vec2, normal: Vec2): LaserPoint2DLine = new LaserPoint2DLine(sid, point, normal)
+  def apply(laserPoint2D: LaserPoint2D, normal: Vec2): LaserPoint2DLine = new LaserPoint2DLine(laserPoint2D, normal)
+}
+
+/**
+ * コーナ上のスキャン点
+ * @param sid スキャンID
+ * @param point 位置座標
+ * @param normal 法線ベクトル
+ */
+class LaserPoint2DCorner(override val sid: Int, override val point: Vec2, val normal: Vec2) extends LaserPoint2D(sid, point) {
+  def this(laserPoint2D: LaserPoint2D, normal: Vec2) {
+    this(laserPoint2D.sid, laserPoint2D.point, normal)
+  }
+}
+
+object LaserPoint2DCorner {
+  def apply(sid: Int, point: Vec2, normal: Vec2): LaserPoint2DLine = new LaserPoint2DLine(sid, point, normal)
+  def apply(laserPoint2D: LaserPoint2D, normal: Vec2): LaserPoint2DLine = new LaserPoint2DLine(laserPoint2D, normal)
+}
+
+/**
+ * 孤立点
+ * @param sid スキャンID
+ * @param point 位置座標
+ */
+class LaserPoint2DIsolate(override val sid: Int, override val point: Vec2) extends LaserPoint2D(sid, point) {
+
+}
+
+object LaserPoint2DIsolate {
+  def apply(sid: Int, point: Vec2): LaserPoint2DIsolate = new LaserPoint2DIsolate(sid, point)
+  def apply(laserPoint2D: LaserPoint2D): LaserPoint2DIsolate = new LaserPoint2DIsolate(laserPoint2D.sid, laserPoint2D.point)
+}
+
+/**
  * 1回のスキャンデータ
  * @param sid
  * @param laserPoints センサの測定値の並び。ローカル座標と地図座標の2パターンがある。
  * @param pose ロボットの位置ベクトル
  */
 class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D) {
+  /**
+   * スキャン点の間隔を一定になるように再サンプリングします。
+   * @return
+   */
   def resamplePoints(): Scan2D = {
+    /**
+     * 補間点を見つけます。
+     * @param currentPoint
+     * @param prevPoint
+     * @param accumulateDist
+     * @return
+     */
     def findInterpolatePoint(currentPoint: LaserPoint2D, prevPoint: LaserPoint2D, accumulateDist: Double): Either[Double, (LaserPoint2D, Boolean)] = {
       val dThresholdS = 0.05
       val dThresholdL = 0.25
@@ -241,6 +308,62 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
   }
 
   /**
+   * スキャン点を色線、コーナ、孤立に分類し、法線ベクトルを求める。
+   * @return
+   */
+  def analysePoints(): Scan2D = {
+    val fpdMin = 0.06    // 隣接点との最小距離
+    val fpdMax = 1.0     // 隣接点との最大距離
+
+    val cornerThreshold = 45.0 // これより角度が大きいとコーナとみなす。
+    val cornerCosThreshold = math.cos(math.toRadians(cornerThreshold))
+
+    // 法線ベクトルを計算
+    def calcNormal(point: LaserPoint2D, adjacentPoints: Seq[LaserPoint2D]): Option[Vec2] = {
+      adjacentPoints.dropWhile(_.point.distance(point.point) < fpdMin).headOption.flatMap { adjacentPoint =>
+        if (adjacentPoint.point.distance(point.point) <= fpdMax) {
+          val diff = adjacentPoint.point - point.point
+          val normal = Vec2(diff.x, -diff.y).normalize()
+          Some(normal)
+        } else {
+          None
+        }
+      }
+    }
+
+    def itr(leftPoints: List[LaserPoint2D], currentPoint: LaserPoint2D, rightPoints: Seq[LaserPoint2D]): Scan2D = {
+      if (rightPoints.isEmpty) {
+        new Scan2D(sid, leftPoints.reverse, pose)
+      } else {
+        val analysedPoint = (calcNormal(currentPoint, leftPoints), calcNormal(currentPoint, rightPoints)) match {
+          case (Some(leftNormal), Some(rightNormal)) => {
+            val rightNormalRev = rightNormal * -1
+            val averageNormal = (leftNormal + rightNormalRev).normalize()
+            if (math.abs(leftNormal * rightNormalRev) >= cornerCosThreshold) {
+              LaserPoint2DLine(currentPoint, averageNormal)
+            } else {
+              LaserPoint2DCorner(currentPoint, averageNormal)
+            }
+          }
+          case (Some(leftNormal), None) => {
+            LaserPoint2DLine(currentPoint, leftNormal)
+          }
+          case (None, Some(rightNormal)) => {
+            LaserPoint2DLine(currentPoint, rightNormal)
+          }
+          case (None, None) => {
+            LaserPoint2DIsolate(currentPoint)
+          }
+        }
+
+        itr(analysedPoint :: leftPoints, rightPoints.head, rightPoints.tail)
+      }
+    }
+
+    itr(Nil, laserPoints.head, laserPoints.tail)
+  }
+
+  /**
    * スキャン・マッチングをします。
    * @param referenceScanGlobal 参照スキャン
    * @param lastScanPose 前回スキャン時のロボットの位置。
@@ -253,6 +376,7 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
       case Some(estimatedPose) =>
         new Scan2D(sid, laserPoints.map(estimatedPose.calcGlobalPoint), estimatedPose)
       case None => {
+        println("not match")
         new Scan2D(sid, laserPoints.map(predicatePose.calcGlobalPoint), predicatePose)
       }
     }
@@ -336,7 +460,14 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
     def calcCost(pose: Pose2D): Double = {
       matchPointTuples.map { tuple =>
         val (curPoint, refPoint) = tuple
-        pose.calcGlobalPoint(curPoint).point.squared_distance(refPoint.point)
+        refPoint match {
+          case line: LaserPoint2DLine => {
+            val curPointGlobal = pose.calcGlobalPoint(curPoint)
+            val perpendicularDistance = (curPointGlobal.point - line.point) * line.normal
+            perpendicularDistance * perpendicularDistance
+          }
+          case ref => pose.calcGlobalPoint(curPoint).point.squared_distance(ref.point)
+        }
       }.sum / matchPointTuples.length * 100
     }
 
@@ -460,15 +591,21 @@ class PointCloudMap {
     }
   }
 
-  def calcRepresentativePoints(): Seq[LaserPoint2D] = {
+  def calcRepresentativePoints(): Seq[LaserPoint2DLine] = {
     val representativePoints = (for (row <- grid;
                                      cell <- row)
       yield {
-        if (cell.isEmpty) {
+        val linePoints = cell.flatMap(_ match {
+          case linePoint: LaserPoint2DLine => Some(linePoint)
+          case _ => None
+        })
+        if (linePoints.isEmpty) {
           None
         } else {
-          val pointAverage = (cell.map(_.point).reduce(_ + _)) / cell.length
-          Some(LaserPoint2D(-1, pointAverage))
+          val (pointSum, normalSum) = linePoints.foldLeft((Vec2(0, 0), Vec2(0, 0))) { (vecPair, linePoint) =>
+            (vecPair._1 + linePoint.point, vecPair._2 + linePoint.normal)
+          }
+          Some(LaserPoint2DLine(-1, pointSum / linePoints.length, normalSum / linePoints.length))
         }
       }).toList.flatten
 
@@ -478,7 +615,7 @@ class PointCloudMap {
 
 object Slam extends JFXApp {
   override def main(args: Array[String]): Unit = {
-    scans = Scan2D.readFile(args(0))
+    scans = Scan2D.readFile(args(0)).map(_.resamplePoints().analysePoints())
     super.main(args)
   }
 
@@ -537,7 +674,7 @@ object Slam extends JFXApp {
           Thread.sleep(100)
           val currentScan = scans.head
           val repPoints = pointCloudMap.calcRepresentativePoints()
-          currentScan.resamplePoints().matchScan(new Scan2D(currentScan.sid - 1, repPoints, lastPose), lastScanPose)
+          currentScan.matchScan(new Scan2D(currentScan.sid - 1, repPoints, lastPose), lastScanPose)
         }
       }
       task.setOnSucceeded( _ => {
@@ -553,6 +690,7 @@ object Slam extends JFXApp {
   }
 
   stage = new PrimaryStage {
+//    title = "SLAM Corridor Perpendicular Distance"
     title = "SLAM Hall Interpolate Scan Point"
     scene = new Scene {
       content = canvas
