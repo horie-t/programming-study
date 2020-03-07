@@ -145,6 +145,17 @@ class Mat3(m00: Double, m01: Double, m02: Double,
     mat(2)(0) * v.x + mat(2)(1) * v.y + mat(2)(2) * v.z
   )
 
+  def *(n: Double): Mat3 = Mat3(
+    mat(0)(0) * n, mat(0)(1) * n, mat(0)(2) * n,
+    mat(1)(0) * n, mat(1)(1) * n, mat(1)(2) * n,
+    mat(2)(0) * n, mat(2)(1) * n, mat(2)(2) * n
+  )
+  def /(n: Double): Mat3 = Mat3(
+    mat(0)(0) / n, mat(0)(1) / n, mat(0)(2) / n,
+    mat(1)(0) / n, mat(1)(1) / n, mat(1)(2) / n,
+    mat(2)(0) / n, mat(2)(1) / n, mat(2)(2) / n
+  )
+
   def t: Mat3 = Mat3(mat(0)(0), mat(1)(0), mat(2)(0), mat(0)(1), mat(1)(1), mat(2)(1), mat(0)(2), mat(1)(2), mat(2)(2))
   
   def apply(row: Int, col: Int): Double = mat(row)(col)
@@ -153,4 +164,13 @@ class Mat3(m00: Double, m01: Double, m02: Double,
 object Mat3 {
   def apply(m00: Double, m01: Double, m02: Double, m10: Double, m11: Double, m12: Double, m20: Double, m21: Double, m22: Double): Mat3 =
     new Mat3(m00, m01, m02, m10, m11, m12, m20, m21, m22)
+
+  def inv(m: Mat3): Mat3 = {
+    Mat3(
+       m.mat(2)(2) * m.mat(3)(3) - m.mat(2)(3) * m.mat(3)(2), -m.mat(1)(2) * m.mat(3)(3) + m.mat(1)(3) * m.mat(3)(2),  m.mat(1)(2) * m.mat(2)(3) - m.mat(1)(3) * m.mat(2)(2),
+      -m.mat(2)(1) * m.mat(3)(3) + m.mat(2)(3) * m.mat(3)(1),  m.mat(1)(1) * m.mat(3)(3) - m.mat(1)(3) * m.mat(3)(1), -m.mat(1)(1) * m.mat(2)(3) + m.mat(1)(3) * m.mat(2)(1),
+       m.mat(2)(1) * m.mat(3)(2) - m.mat(2)(2) * m.mat(3)(1), -m.mat(1)(1) * m.mat(3)(2) + m.mat(1)(2) * m.mat(3)(1),  m.mat(1)(1) * m.mat(2)(2) - m.mat(1)(2) * m.mat(2)(1)
+    ) / (m.mat(1)(1) * m.mat(2)(2) * m.mat(3)(3) + m.mat(1)(2) * m.mat(2)(3) * m.mat(3)(1) + m.mat(1)(3) * m.mat(2)(1) * m.mat(3)(2)
+      - m.mat(1)(3) * m.mat(2)(2) * m.mat(3)(1) - m.mat(1)(2) * m.mat(2)(1) * m.mat(3)(3) - m.mat(1)(1) * m.mat(2)(3) * m.mat(3)(2))
+  }
 }
