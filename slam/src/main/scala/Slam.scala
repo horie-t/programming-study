@@ -409,6 +409,63 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
     val costIni = calcCost(poseIni)
     itr(poseIni, costIni, poseIni, costIni)
   }
+
+  def fusePose(referenceScanGlobal: Scan2D, estimatedPose: Pose2D, odoMotion: Pose2D, lastPose: Pose2D): Pose2D = {
+    val matchPointTuples = laserPoints.flatMap { curPoint =>
+      val curPointGlobal = estimatedPose.calcGlobalPoint(curPoint)
+      val closestPoint = referenceScanGlobal.laserPoints.minBy(_.point.squared_distance(curPointGlobal.point))
+      if (closestPoint.point.distance(curPointGlobal.point) < 0.2) {
+        Some((curPoint, closestPoint))
+      } else {
+        None
+      }
+    }.toList
+
+    estimatedPose // TODO
+  }
+
+  def calcIcpCovariance(estimatedPose: Pose2D, matchPointTuples: Seq[(LaserPoint2D, LaserPoint2DLine)]): Mat3 = {
+    import Mat3.inv
+
+    def calcPerpendicularDistance(scanPoint: LaserPoint2D, refPoint: LaserPoint2DLine, pose2D: Pose2D): Double = {
+      val scanPointGlobal = pose2D.calcGlobalPoint(scanPoint)
+      scanPointGlobal.point * refPoint.point
+    }
+
+    val diffDistance = 0.00001
+    val diffAngle = math.toRadians(0.00001)
+
+    // ヤコビ行列を計算
+    val jacobianMat = matchPointTuples.map { tuple =>
+      val (scanPoint, refPoint) = tuple
+
+      val pd0 = calcPerpendicularDistance(scanPoint, refPoint, estimatedPose)
+      val pdx = calcPerpendicularDistance(scanPoint, refPoint,
+        Pose2D(Vec2(estimatedPose.point.x + diffDistance, estimatedPose.point.y), estimatedPose.angleRad))
+      val pdy = calcPerpendicularDistance(scanPoint, refPoint,
+        Pose2D(Vec2(estimatedPose.point.x, estimatedPose.point.y + diffDistance), estimatedPose.angleRad))
+      val pdt = calcPerpendicularDistance(scanPoint, refPoint,
+        Pose2D(Vec2(estimatedPose.point.x, estimatedPose.point.y), estimatedPose.angleRad + diffAngle))
+      Vec3((pdx - pd0) / diffDistance, (pdy - pd0) / diffDistance, (pdt - pd0) / diffAngle)
+    }
+
+    // ヘッセ行列を、ガウス-ニュートン近似で計算
+    val hessianMat = jacobianMat.foldLeft(Mat3(0, 0, 0, 0, 0, 0, 0, 0, 0)) { (hesMat, jacobRow) =>
+      hesMat(0, 0) += jacobRow.x * jacobRow.x
+      hesMat(0, 1) += jacobRow.x * jacobRow.y
+      hesMat(0, 2) += jacobRow.x * jacobRow.z
+      hesMat(1, 1) += jacobRow.y * jacobRow.y
+      hesMat(1, 2) += jacobRow.y * jacobRow.z
+      hesMat(2, 2) += jacobRow.z + jacobRow.z
+      hesMat
+    }
+    hessianMat(1, 0) += hessianMat(0, 1)
+    hessianMat(2, 0) += hessianMat(0, 2)
+    hessianMat(2, 1) += hessianMat(1, 2)
+
+    // 共分散行列は、ヘッセ行列の逆行列の定数倍とする(ラプラス近似)
+    inv(hessianMat) * 0.1
+  }
 }
 
 object Scan2D {
@@ -517,27 +574,27 @@ object Slam extends JFXApp {
 
   var scans: Seq[Scan2D] = _
 
-//  val canvas = new Canvas(800, 500)
-  val canvas = new Canvas(600, 600)
+  val canvas = new Canvas(800, 500)
+//  val canvas = new Canvas(600, 600)
   val gc = canvas.graphicsContext2D
 
   // 左下が負の象限になるようにする。
   gc.scale(20, 20)
-//  gc.transform(1, 0, 0, -1, 7.51, 7.51)  // 0.01は線の半分(これを足さないと線がボケる)
-  gc.transform(1, 0, 0, -1, 12.51, 22.51)  // 0.01は線の半分(これを足さないと線がボケる)
+  gc.transform(1, 0, 0, -1, 7.51, 7.51)  // 0.01は線の半分(これを足さないと線がボケる)
+//  gc.transform(1, 0, 0, -1, 12.51, 22.51)  // 0.01は線の半分(これを足さないと線がボケる)
 
   // 枠を描く
   gc.stroke = Color.Black
   gc.lineWidth = 0.02
 
-//  val left = -5
-//  val right = 30
-//  val bottom = -15
-//  val top = 5
-  val left = -10
-  val right = 15
-  val bottom = -5
-  val top = 20
+  val left = -5
+  val right = 30
+  val bottom = -15
+  val top = 5
+//  val left = -10
+//  val right = 15
+//  val bottom = -5
+//  val top = 20
   gc.strokeLine( left, bottom, right, bottom)  // 下
   gc.strokeLine( left, bottom,  left,    top)  // 左
   gc.strokeLine( left,    top, right,    top)  // 上
@@ -567,7 +624,6 @@ object Slam extends JFXApp {
     if (scans.nonEmpty) {
       val task = new Task[Scan2D]() {
         override protected def call: Scan2D = {
-          Thread.sleep(100)
           val currentScan = scans.head
           val repPoints = pointCloudMap.calcRepresentativePoints()
           currentScan.matchScan(new Scan2D(currentScan.sid - 1, repPoints, lastPose), lastScanPose)
