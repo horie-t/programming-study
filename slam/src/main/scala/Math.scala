@@ -72,6 +72,38 @@ object Vec2 {
   def apply(x: Double, y: Double): Vec2 = new Vec2(x, y)
 }
 
+class Vec3(val x: Double, val y: Double, val z: Double) {
+
+  /**
+   * 和を返します。
+   * @param v2
+   * @return
+   */
+  def +(v2: Vec3): Vec3 = Vec3(x + v2.x, y + v2.y, z + v2.z)
+
+  /**
+   * 差を返します。
+   * @param v2
+   * @return
+   */
+  def -(v2: Vec3): Vec3 = Vec3(x - v2.x, y - v2.y, z - v2.z)
+
+  /**
+   * 内積を返します。
+   * @param v2
+   * @return
+   */
+  def *(v2: Vec3): Double = x * v2.x + y * v2.y + z * v2.z
+
+  def *(n: Double): Vec3 = Vec3(x * n, y * n, z * n)
+  def /(n: Double): Vec3 = Vec3(x / n, y / n, z / n)
+
+}
+
+object Vec3 {
+  def apply(x: Double, y: Double, z: Double): Vec3 = new Vec3(x, y, z)
+}
+
 /**
  * 2x2行列
  * @param m00
@@ -100,4 +132,25 @@ class Mat2(val m00: Double, val m01: Double, val m10: Double, val m11: Double) {
 
 object Mat2 {
   def apply(m00: Double, m01: Double, m10: Double, m11: Double): Mat2 = new Mat2(m00, m01, m10, m11)
+}
+
+class Mat3(m00: Double, m01: Double, m02: Double,
+           m10: Double, m11: Double, m12: Double,
+           m20: Double, m21: Double, m22: Double) {
+  val mat = Array(Array(m00, m01, m02), Array(m10, m11, m12), Array(m20, m21, m22))
+
+  def *(v: Vec3): Vec3 = Vec3(
+    mat(0)(0) * v.x + mat(0)(1) * v.y + mat(0)(2) * v.z,
+    mat(1)(0) * v.x + mat(1)(1) * v.y + mat(1)(2) * v.z,
+    mat(2)(0) * v.x + mat(2)(1) * v.y + mat(2)(2) * v.z
+  )
+
+  def t: Mat3 = Mat3(mat(0)(0), mat(1)(0), mat(2)(0), mat(0)(1), mat(1)(1), mat(2)(1), mat(0)(2), mat(1)(2), mat(2)(2))
+  
+  def apply(row: Int, col: Int): Double = mat(row)(col)
+}
+
+object Mat3 {
+  def apply(m00: Double, m01: Double, m02: Double, m10: Double, m11: Double, m12: Double, m20: Double, m21: Double, m22: Double): Mat3 =
+    new Mat3(m00, m01, m02, m10, m11, m12, m20, m21, m22)
 }
