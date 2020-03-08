@@ -2,7 +2,6 @@ package example
 
 import java.util.Base64
 
-import scala.collection.JavaConverters._
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.RequestHandler
 
