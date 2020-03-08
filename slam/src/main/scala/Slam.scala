@@ -466,6 +466,21 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
     // 共分散行列は、ヘッセ行列の逆行列の定数倍とする(ラプラス近似)
     inv(hessianMat) * 0.1
   }
+
+  def calcMotionCovariance(motion: Pose2D, diffTime: Double): Mat3 = {
+    val transitionVelocity = motion.point.length() / diffTime
+    val angularVelocity = motion.angleRad / diffTime
+
+    val transitionVelocityThreshold = 0.02
+    val angularVelocityThreshold = 0.05
+    val (vt, wt) =
+      (if (transitionVelocity < transitionVelocityThreshold) transitionVelocityThreshold else transitionVelocity,
+       if (angularVelocity < angularVelocityThreshold) angularVelocityThreshold else angularVelocity)
+    
+    Mat3(0.001 * vt * vt,              0,              0,
+                       0, 0.005* vt * vt,              0,
+                       0,              0, 0.05 * wt * wt)
+  }
 }
 
 object Scan2D {
