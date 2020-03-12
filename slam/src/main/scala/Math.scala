@@ -139,6 +139,20 @@ class Mat3(m00: Double, m01: Double, m02: Double,
            m20: Double, m21: Double, m22: Double) {
   val mat = Array(Array(m00, m01, m02), Array(m10, m11, m12), Array(m20, m21, m22))
 
+  def *(m: Mat3): Mat3 = Mat3(
+    mat(0)(0) * m.mat(0)(0) + mat(0)(1) * m.mat(1)(0) + mat(0)(2) * m.mat(2)(0),
+    mat(0)(0) * m.mat(0)(1) + mat(0)(1) * m.mat(1)(1) + mat(0)(2) * m.mat(2)(1),
+    mat(0)(0) * m.mat(0)(2) + mat(0)(2) * m.mat(1)(0) + mat(0)(2) * m.mat(2)(2),
+
+    mat(1)(0) * m.mat(1)(0) + mat(1)(1) * m.mat(1)(0) + mat(1)(2) * m.mat(2)(0),
+    mat(1)(0) * m.mat(1)(1) + mat(1)(1) * m.mat(1)(1) + mat(1)(2) * m.mat(2)(1),
+    mat(1)(0) * m.mat(0)(2) + mat(1)(2) * m.mat(1)(0) + mat(1)(2) * m.mat(2)(2),
+
+    mat(2)(0) * m.mat(1)(0) + mat(2)(1) * m.mat(1)(0) + mat(2)(2) * m.mat(2)(0),
+    mat(2)(0) * m.mat(1)(1) + mat(2)(1) * m.mat(1)(1) + mat(2)(2) * m.mat(2)(1),
+    mat(2)(0) * m.mat(0)(2) + mat(2)(2) * m.mat(1)(0) + mat(2)(2) * m.mat(2)(2)
+  )
+
   def *(v: Vec3): Vec3 = Vec3(
     mat(0)(0) * v.x + mat(0)(1) * v.y + mat(0)(2) * v.z,
     mat(1)(0) * v.x + mat(1)(1) * v.y + mat(1)(2) * v.z,

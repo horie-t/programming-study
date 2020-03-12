@@ -481,6 +481,19 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
                        0, 0.005* vt * vt,              0,
                        0,              0, 0.05 * wt * wt)
   }
+
+  def rotateCovariance(pose: Pose2D, covariance: Mat3): Mat3 = {
+    val cosign = Math.cos(pose.angleRad)
+    val sign  = Math.sin(pose.angleRad)
+
+    val jacobianRotate = Mat3(
+      cosign, - sign, 0,
+        sign, cosign, 0,
+           0,      0, 1
+    )
+
+    jacobianRotate * covariance * jacobianRotate.t
+  }
 }
 
 object Scan2D {
