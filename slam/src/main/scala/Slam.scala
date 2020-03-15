@@ -49,6 +49,8 @@ class Pose2D(val point: Vec2, val angleRad: Double) {
     }
   }
 
+  def toVec3(): Vec3 = Vec3(point.x, point.y, angleRad)
+
   /**
    * 角度を-π〜πの間に正規化します。
    * @param angle
@@ -67,6 +69,7 @@ class Pose2D(val point: Vec2, val angleRad: Double) {
 
 object Pose2D {
   def apply(point: Vec2, angleRad: Double): Pose2D = new Pose2D(point, angleRad)
+  def apply(vec3: Vec3): Pose2D                    = apply(Vec2(vec3.x, vec3.y), vec3.z)
 }
 
 /**
@@ -270,9 +273,11 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
     val predicatePose = referenceScanGlobal.pose + oddMotion
     estimatePose(predicatePose, this, referenceScanGlobal) match {
       case Some(estimatedPose) =>
+        // センサ融合が上手く行かないので、一時、コメントアウト
+//        val fusedPose = fusePose(referenceScanGlobal, estimatedPose, oddMotion, lastScanPose)
+//        new Scan2D(sid, laserPoints.map(fusedPose.calcGlobalPoint), fusedPose)
         new Scan2D(sid, laserPoints.map(estimatedPose.calcGlobalPoint), estimatedPose)
       case None => {
-        println("not match")
         new Scan2D(sid, laserPoints.map(predicatePose.calcGlobalPoint), predicatePose)
       }
     }
@@ -411,17 +416,43 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
   }
 
   def fusePose(referenceScanGlobal: Scan2D, estimatedPose: Pose2D, odoMotion: Pose2D, lastPose: Pose2D): Pose2D = {
+    def fuse(pose1: Vec3, cov1: Mat3, pose2: Vec3, cov2: Mat3): Vec3 = {
+      // 共分散を融合する
+      val cov1inv = Mat3.inv(cov1)
+      val cov2inv = Mat3.inv(cov2)
+      val fuseCov = Mat3.inv(cov1inv + cov2inv)
+
+      // 融合時に角度の連続性を維持するため、pose1の角度を修正する
+      val pose1Angle = (pose2.z - pose1.z) match {
+        case diffAngle if (diffAngle >  Math.PI) => pose1.z + 2 * Math.PI
+        case diffAngle if (diffAngle < -Math.PI) => pose1.z - 2 * Math.PI
+        case _ => pose1.z
+      }
+      val pose1Norm = Vec3(pose1.x, pose1.y, pose1Angle)
+
+      // poseを融合して、正規化して返す。
+      val fusedPose = fuseCov * (cov1inv * pose1Norm + cov2inv * pose2)
+      Vec3(fusedPose.x, fusedPose.y,
+        if      (fusedPose.z >  Math.PI) fusedPose.z - 2 * Math.PI
+        else if (fusedPose.z < -Math.PI) fusedPose.z + 2 * Math.PI
+        else    fusedPose.z
+      )
+    }
+
     val matchPointTuples = laserPoints.flatMap { curPoint =>
       val curPointGlobal = estimatedPose.calcGlobalPoint(curPoint)
       val closestPoint = referenceScanGlobal.laserPoints.minBy(_.point.squared_distance(curPointGlobal.point))
-      if (closestPoint.point.distance(curPointGlobal.point) < 0.2) {
-        Some((curPoint, closestPoint))
+      if (closestPoint.point.distance(curPointGlobal.point) < 0.2 && closestPoint.isInstanceOf[LaserPoint2DLine]) {
+        Some((curPoint, closestPoint.asInstanceOf[LaserPoint2DLine]))
       } else {
         None
       }
     }.toList
 
-    estimatedPose // TODO
+    val icpCovariance = calcIcpCovariance(estimatedPose, matchPointTuples)
+    val odoCovariance = rotateCovariance(estimatedPose, calcMotionCovariance(odoMotion, 0.1))
+
+    Pose2D(fuse(estimatedPose.toVec3(), icpCovariance, (lastPose + odoMotion).toVec3(), odoCovariance))
   }
 
   def calcIcpCovariance(estimatedPose: Pose2D, matchPointTuples: Seq[(LaserPoint2D, LaserPoint2DLine)]): Mat3 = {
@@ -451,17 +482,17 @@ class Scan2D(val sid: Int, val laserPoints: Seq[LaserPoint2D], val pose: Pose2D)
 
     // ヘッセ行列を、ガウス-ニュートン近似で計算
     val hessianMat = jacobianMat.foldLeft(Mat3(0, 0, 0, 0, 0, 0, 0, 0, 0)) { (hesMat, jacobRow) =>
-      hesMat(0, 0) += jacobRow.x * jacobRow.x
-      hesMat(0, 1) += jacobRow.x * jacobRow.y
-      hesMat(0, 2) += jacobRow.x * jacobRow.z
-      hesMat(1, 1) += jacobRow.y * jacobRow.y
-      hesMat(1, 2) += jacobRow.y * jacobRow.z
-      hesMat(2, 2) += jacobRow.z + jacobRow.z
+      hesMat.mat(0)(0) += jacobRow.x * jacobRow.x
+      hesMat.mat(0)(1) += jacobRow.x * jacobRow.y
+      hesMat.mat(0)(2) += jacobRow.x * jacobRow.z
+      hesMat.mat(1)(1) += jacobRow.y * jacobRow.y
+      hesMat.mat(1)(2) += jacobRow.y * jacobRow.z
+      hesMat.mat(2)(2) += jacobRow.z + jacobRow.z
       hesMat
     }
-    hessianMat(1, 0) += hessianMat(0, 1)
-    hessianMat(2, 0) += hessianMat(0, 2)
-    hessianMat(2, 1) += hessianMat(1, 2)
+    hessianMat.mat(1)(0) += hessianMat(0, 1)
+    hessianMat.mat(2)(0) += hessianMat(0, 2)
+    hessianMat.mat(2)(1) += hessianMat(1, 2)
 
     // 共分散行列は、ヘッセ行列の逆行列の定数倍とする(ラプラス近似)
     inv(hessianMat) * 0.1
