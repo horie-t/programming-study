@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+onmt_train -config train_en_ja.yml

@@ -1,0 +1,24 @@
+service: aws-lambda
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-west-2
+  iam:
+    role:
+      statements:
+        - Effect: "Allow"
+          Action:
+            - "sagemaker:InvokeEndpoint"
+          Resource: "arn:aws:sagemaker:*:*:endpoint/ctranslate2"
+
+functions:
+  translate:
+    handler: handler.translate
+    events:
+      - httpApi:
+          path: /translate
+          method: post
+    timeout: 29
