@@ -1,0 +1,16 @@
+service: aws-lambda
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.8
+  region: us-west-2
+  iam:
+    role: arn:aws:iam::XXXXXXXXXXXX:role/lambda-timestream-role
+
+functions:
+  room_condition:
+    handler: handler.write_record
+    events:
+      - iot:
+         sql: "SELECT * FROM 'room_condition'"

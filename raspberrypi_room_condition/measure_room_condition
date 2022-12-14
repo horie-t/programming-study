@@ -1,0 +1,12 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:             scd30d
+# Required-Start:       $remote_fs $syslog $network $named
+# Required-Stop:        $remote_fs $syslog
+# Default-Start:        2 3 4 5
+# Default-Stop:
+# Short-Description:    Measure room condition
+### END INIT INFO
+
+(cd /home/pi && ./measure_room_condition.py)
