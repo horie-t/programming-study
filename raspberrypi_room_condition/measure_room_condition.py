@@ -101,6 +101,7 @@ scd30 = SCD30()
 
 measurment_interval_sec = 10
 scd30.set_measurement_interval(measurment_interval_sec)
+scd30.set_auto_self_calibration(active=True)
 scd30.start_periodic_measurement()
 
 time.sleep(2)
