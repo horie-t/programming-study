@@ -1,0 +1,15 @@
+save_data: data/en-ja/jparacrawl
+## Where the vocab(s) will be written
+src_vocab: data/en-ja/jparacrawl.vocab.src
+tgt_vocab: data/en-ja/jparacrawl.vocab.tgt
+# Prevent overwriting existing files in the folder
+overwrite: False
+
+# Corpus opts:
+data:
+    corpus_1:
+        path_src: data/en-ja/train.en
+        path_tgt: data/en-ja/train.ja
+    valid:
+        path_src: data/en-ja/val.en
+        path_tgt: data/en-ja/val.ja
