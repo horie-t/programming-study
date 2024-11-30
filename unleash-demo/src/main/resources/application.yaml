@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: unleash-demo
+
+io:
+  getunleash:
+    app-name: unleash-onboarding-java
+    instance-id: unleash-onboarding-instance
+    environment: development
+    api-url: "http://localhost:4242/api"
+    api-token: "default:development.unleash-insecure-api-token"

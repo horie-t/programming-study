@@ -1,10 +1,14 @@
 package com.t_horie.unleash_demo;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
+@AllArgsConstructor
 @Data
+@NoArgsConstructor
 public class Task {
-    private final String id;
-    private final String title;
-    private final String description;
+    private String id;
+    private String title;
+    private String description;
 }
