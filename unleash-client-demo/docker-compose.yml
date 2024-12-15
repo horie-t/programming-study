@@ -1,4 +1,12 @@
 services:
+  nginx:
+    container_name: next-app-nginx
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+
   next-app:
     container_name: next-app
     build:
@@ -8,7 +16,7 @@ services:
       - ./public:/app/public
     restart: always
     ports:
-      - 3000:3000
+      - "3000:3000"
 
   unleash:
     image: unleashorg/unleash-server:latest
