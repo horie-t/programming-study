@@ -2,17 +2,12 @@
 import dynamic from "next/dynamic";
 import { FlagProvider } from "@unleash/proxy-client-react";
 import { Todo } from "./Todo";
-//import { TodoComponent } from "./TodoComponent";
 
 const unleashConfig = {
     url: 'http://localhost:4242/api/frontend/',
     clientKey: 'default:development.unleash-insecure-frontend-api-token',
     appName: 'unleash-onboarding-react'
 }
-
-const FlagComponent = dynamic(() => import('./TextComponent').then((mod) => mod.TestComponent), {
-    ssr: false,
-});
 
 const TodoComponent = dynamic(() => import('./TodoComponent').then((mod) => mod.TodoComponent), {
     ssr: false,

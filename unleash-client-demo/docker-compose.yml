@@ -1,12 +1,4 @@
 services:
-  nginx:
-    container_name: next-app-nginx
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
-    ports:
-      - "80:80"
-
   next-app:
     container_name: next-app
     build:
