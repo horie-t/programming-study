@@ -9,6 +9,7 @@ This directory contains Terraform configuration files for deploying an Amazon EK
 - **Node Group**: A group of EC2 instances running as Kubernetes nodes
 - **AWS Load Balancer Controller**: A controller that manages AWS Elastic Load Balancers for Kubernetes services
 - **ArgoCD**: A declarative, GitOps continuous delivery tool for Kubernetes
+- **ECR Repository**: A private Docker container registry for storing and managing container images
 
 ## AWS Load Balancer Controller
 
@@ -95,6 +96,69 @@ $(terraform output -raw check_argocd_status)
 ```
 
 You can access ArgoCD using either the ALB hostname or the custom domain name (if DNS has propagated). The default username is `admin`. You should change the password after the first login.
+
+## ECR Repository
+
+An Amazon Elastic Container Registry (ECR) repository is created to store Docker container images for your applications. The repository is configured with the following settings:
+
+- **Name**: Based on the EKS cluster name (e.g., `lean-saas-eks-app-repository`)
+- **Image Scanning**: Enabled on push
+- **Image Tag Mutability**: Mutable (allows overwriting of image tags)
+- **Lifecycle Policy**: Keeps the last 10 images and expires older ones
+
+### IAM Permissions
+
+The EKS node group is configured with the necessary IAM permissions to access the ECR repository. This allows pods running on the EKS cluster to pull images from the repository without additional configuration.
+
+The IAM policy grants the following permissions:
+- Pull images from the repository
+- Push images to the repository
+- Manage repository settings and images
+
+### Using the ECR Repository
+
+After the deployment is complete, you can use the ECR repository with the following steps:
+
+```bash
+# Get the ECR repository URL
+echo "ECR Repository URL: $(terraform output -raw ecr_repository_url)"
+
+# Authenticate Docker with ECR
+$(terraform output -raw docker_login_command)
+
+# Build and tag your Docker image
+docker build -t your-app:latest .
+
+# Push your Docker image to ECR
+docker tag your-app:latest $(terraform output -raw ecr_repository_url):latest
+docker push $(terraform output -raw ecr_repository_url):latest
+```
+
+### Using ECR Images in Kubernetes
+
+To use images from your ECR repository in Kubernetes deployments, specify the full repository URL in your container image:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: your-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: your-app
+  template:
+    metadata:
+      labels:
+        app: your-app
+    spec:
+      containers:
+      - name: your-app
+        image: 123456789012.dkr.ecr.us-west-2.amazonaws.com/lean-saas-eks-app-repository:latest  # Replace with your actual ECR repository URL
+        ports:
+        - containerPort: 80
+```
 
 ## Usage
 

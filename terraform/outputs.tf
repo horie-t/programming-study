@@ -115,3 +115,29 @@ output "argocd_route53_record_target" {
   description = "Target of Route53 record for ArgoCD domain"
   value       = tolist(aws_route53_record.argocd.records)[0]
 }
+
+# ECR Repository Outputs
+output "ecr_repository_url" {
+  description = "URL of the ECR repository"
+  value       = aws_ecr_repository.app_repository.repository_url
+}
+
+output "ecr_repository_name" {
+  description = "Name of the ECR repository"
+  value       = aws_ecr_repository.app_repository.name
+}
+
+output "ecr_repository_arn" {
+  description = "ARN of the ECR repository"
+  value       = aws_ecr_repository.app_repository.arn
+}
+
+output "docker_login_command" {
+  description = "Command to authenticate Docker with ECR"
+  value       = "aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin ${aws_ecr_repository.app_repository.repository_url}"
+}
+
+output "docker_push_command_example" {
+  description = "Example command to push a Docker image to ECR"
+  value       = "docker tag your-image:latest ${aws_ecr_repository.app_repository.repository_url}:latest && docker push ${aws_ecr_repository.app_repository.repository_url}:latest"
+}

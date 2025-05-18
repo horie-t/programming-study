@@ -9,6 +9,7 @@ This repository contains infrastructure as code (IaC) and sample applications fo
   - VPC and networking
   - AWS Load Balancer Controller
   - ArgoCD (GitOps continuous delivery tool)
+  - ECR Repository (Container registry for storing Docker images)
 
 - **sample/**: Sample applications and configurations
   - **sample-nginx/**: Basic Nginx deployment with LoadBalancer service
@@ -32,6 +33,12 @@ This repository contains infrastructure as code (IaC) and sample applications fo
 3. Access ArgoCD:
    - Get the URL and credentials from Terraform outputs
    - Use ArgoCD to deploy applications using GitOps
+
+4. Use the ECR repository:
+   - Get the repository URL from Terraform outputs
+   - Authenticate Docker with ECR
+   - Push your container images to the repository
+   - Use the images in your Kubernetes deployments
 
 ## Documentation
 
