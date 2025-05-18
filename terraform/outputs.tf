@@ -68,3 +68,50 @@ output "check_aws_load_balancer_controller" {
   description = "Command to check the status of the AWS Load Balancer Controller"
   value       = "kubectl get deployment aws-load-balancer-controller -n kube-system"
 }
+
+# ArgoCD Outputs
+output "argocd_namespace" {
+  description = "Namespace where ArgoCD is installed"
+  value       = kubernetes_namespace.argocd.metadata[0].name
+}
+
+output "argocd_server_service" {
+  description = "Name of the ArgoCD server service"
+  value       = "argocd-server"
+}
+
+output "argocd_ingress_name" {
+  description = "Name of the ArgoCD ingress resource"
+  value       = kubernetes_ingress_v1.argocd.metadata[0].name
+}
+
+output "argocd_url" {
+  description = "URL to access ArgoCD"
+  value       = "https://${aws_acm_certificate.argocd.domain_name}"
+}
+
+output "get_argocd_admin_password" {
+  description = "Command to get the initial ArgoCD admin password"
+  value       = "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+}
+
+output "check_argocd_status" {
+  description = "Command to check the status of ArgoCD deployment"
+  value       = "kubectl get pods -n argocd"
+}
+
+# Route53 Record for ArgoCD
+output "argocd_route53_record" {
+  description = "Route53 record for ArgoCD domain"
+  value       = aws_route53_record.argocd.name
+}
+
+output "argocd_route53_record_type" {
+  description = "Type of Route53 record for ArgoCD domain"
+  value       = aws_route53_record.argocd.type
+}
+
+output "argocd_route53_record_target" {
+  description = "Target of Route53 record for ArgoCD domain"
+  value       = tolist(aws_route53_record.argocd.records)[0]
+}
