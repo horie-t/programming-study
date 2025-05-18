@@ -5,11 +5,13 @@ This directory contains Kubernetes manifests to deploy an Nginx web server and e
 ## Contents
 
 - `nginx-alb.yaml`: Contains the Deployment, Service, and Ingress manifests for Nginx with ALB configuration
+- `application.yaml`: ArgoCD Application manifest for deploying this sample using GitOps
 
 ## Prerequisites
 
 - EKS cluster with the AWS Load Balancer Controller installed
 - IAM roles for service accounts (IRSA) configured for the AWS Load Balancer Controller
+- ArgoCD installed (optional, only required for GitOps-based deployment)
 
 If you haven't installed the AWS Load Balancer Controller, you can do so using Helm:
 
@@ -55,6 +57,35 @@ kubectl get service nginx
 kubectl get ingress nginx-ingress
 ```
 
+## Deploying with ArgoCD
+
+This sample can also be deployed using ArgoCD for GitOps-based continuous delivery:
+
+### Option 1: Using Terraform (Recommended)
+
+The Terraform configuration in this repository automatically registers this sample as an ArgoCD application. After applying the Terraform configuration, you can check the status of the application:
+
+```bash
+# Check the status of the application in ArgoCD
+kubectl get application nginx-alb-sample -n argocd
+```
+
+### Option 2: Manual Deployment
+
+You can also manually deploy this sample using the provided ArgoCD Application manifest:
+
+```bash
+# Apply the ArgoCD Application manifest
+kubectl apply -f application.yaml
+```
+
+### Viewing in ArgoCD UI
+
+1. Access the ArgoCD UI using the URL provided in the Terraform outputs
+2. Log in with the admin credentials
+3. Navigate to the "Applications" section
+4. Click on the "nginx-alb-sample" application to view its status and details
+
 ## Accessing the Application
 
 Once the ALB is provisioned (which might take a few minutes), you can access Nginx using the ALB's address:
@@ -71,10 +102,24 @@ You can also open the ALB address in a web browser.
 
 ## Cleanup
 
-To remove the deployment, service, and ingress:
+### Option 1: Cleanup with kubectl
+
+To remove the deployment, service, and ingress directly:
 
 ```bash
 kubectl delete -f nginx-alb.yaml
+```
+
+### Option 2: Cleanup with ArgoCD
+
+If you deployed the application using ArgoCD, you can remove it by deleting the ArgoCD Application:
+
+```bash
+# If deployed manually
+kubectl delete -f application.yaml
+
+# If deployed with Terraform
+kubectl delete application nginx-alb-sample -n argocd
 ```
 
 Note that it may take a few minutes for the ALB to be fully deleted from AWS.

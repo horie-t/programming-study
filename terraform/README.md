@@ -60,6 +60,22 @@ ArgoCD is configured with a Route53 record that points to the ALB:
 
 This allows you to access ArgoCD using a custom domain name instead of the ALB's default hostname.
 
+### Pre-configured Applications
+
+ArgoCD is configured with the following applications:
+
+- **Nginx ALB Sample**: A sample application that deploys Nginx with an AWS Application Load Balancer
+  - **Path**: sample/sample-nginx-alb
+  - **Namespace**: default
+  - **Sync Policy**: Automated with pruning and self-healing
+
+You can check the status of the pre-configured applications using the following commands:
+
+```bash
+# Check the status of the Nginx ALB application
+$(terraform output -raw check_argocd_nginx_alb_application)
+```
+
 ### Accessing ArgoCD
 
 After the deployment is complete, you can access ArgoCD using the following steps:
