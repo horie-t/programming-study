@@ -52,3 +52,19 @@ output "configure_kubectl" {
   description = "Command to configure kubectl to connect to the EKS cluster"
   value       = "aws eks update-kubeconfig --region us-west-2 --name ${module.eks.cluster_name}"
 }
+
+# AWS Load Balancer Controller Outputs
+output "aws_load_balancer_controller_role_arn" {
+  description = "ARN of the IAM role for AWS Load Balancer Controller"
+  value       = module.lb_controller_role.iam_role_arn
+}
+
+output "aws_load_balancer_controller_policy_arn" {
+  description = "ARN of the IAM policy for AWS Load Balancer Controller"
+  value       = aws_iam_policy.aws_load_balancer_controller.arn
+}
+
+output "check_aws_load_balancer_controller" {
+  description = "Command to check the status of the AWS Load Balancer Controller"
+  value       = "kubectl get deployment aws-load-balancer-controller -n kube-system"
+}
