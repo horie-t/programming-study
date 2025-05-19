@@ -55,6 +55,13 @@ variable "public_subnets" {
   default     = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 }
 
+# GitHub Configuration
+variable "github_token" {
+  description = "GitHub personal access token for accessing private repositories"
+  type        = string
+  sensitive   = true
+}
+
 # Tags
 variable "tags" {
   description = "A map of tags to add to all resources"

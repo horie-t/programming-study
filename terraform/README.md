@@ -61,11 +61,20 @@ ArgoCD is configured with a Route53 record that points to the ALB:
 
 This allows you to access ArgoCD using a custom domain name instead of the ALB's default hostname.
 
+### Private Repository Access
+
+ArgoCD is configured to access a private GitHub repository using a personal access token. The repository credentials are stored in a Kubernetes secret and used by ArgoCD to authenticate with GitHub.
+
+- **Repository URL**: https://github.com/horie-t/argocd-repo
+- **Authentication**: GitHub personal access token
+- **Secret Name**: argocd-github-repo
+
 ### Pre-configured Applications
 
 ArgoCD is configured with the following applications:
 
 - **Nginx ALB Sample**: A sample application that deploys Nginx with an AWS Application Load Balancer
+  - **Repository**: https://github.com/horie-t/argocd-repo (private repository)
   - **Path**: sample/sample-nginx-alb
   - **Namespace**: default
   - **Sync Policy**: Automated with pruning and self-healing
@@ -166,16 +175,37 @@ spec:
 
 To deploy the EKS cluster with the AWS Load Balancer Controller:
 
-```bash
-# Initialize Terraform
-terraform init
+1. Create a GitHub personal access token with `repo` scope to access the private repository.
 
-# Plan the deployment
-terraform plan
+2. Set the GitHub token as an environment variable or in a `.tfvars` file:
 
-# Apply the configuration
-terraform apply
-```
+   Using environment variable:
+   ```bash
+   export TF_VAR_github_token="your-github-token"
+   ```
+
+   Or create a `terraform.tfvars` file:
+   ```
+   github_token = "your-github-token"
+   ```
+
+3. Deploy the infrastructure:
+
+   ```bash
+   # Initialize Terraform
+   terraform init
+
+   # Plan the deployment
+   terraform plan
+
+   # Apply the configuration
+   terraform apply
+   ```
+
+   If you're using the environment variable method:
+   ```bash
+   terraform apply -var="github_token=your-github-token"
+   ```
 
 ### Accessing the Cluster
 

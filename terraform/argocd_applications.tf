@@ -12,9 +12,9 @@ resource "kubernetes_manifest" "nginx_alb_application" {
     spec = {
       project = "default"
       source = {
-        repoURL        = "https://github.com/horie-t/lean-saas-tech.git"  # Replace with your actual repository URL
+        repoURL        = "https://github.com/horie-t/argocd-repo"  # Private repository URL
         targetRevision = "HEAD"
-        path           = "sample/sample-nginx-alb"
+        path           = "private-app"
       }
       destination = {
         server    = "https://kubernetes.default.svc"

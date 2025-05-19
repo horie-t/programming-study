@@ -7,6 +7,28 @@ resource "kubernetes_namespace" "argocd" {
   }
 }
 
+# Create a Kubernetes secret for GitHub repository credentials
+resource "kubernetes_secret" "argocd_github_repo" {
+  metadata {
+    name      = "argocd-github-repo"
+    namespace = kubernetes_namespace.argocd.metadata[0].name
+    labels = {
+      "argocd.argoproj.io/secret-type" = "repository"
+    }
+  }
+
+  data = {
+    type          = "git"
+    url           = "https://github.com/horie-t/argocd-repo"
+    username      = "horie-t"
+    password      = var.github_token
+  }
+
+  depends_on = [
+    kubernetes_namespace.argocd
+  ]
+}
+
 # Helm Release for ArgoCD
 resource "helm_release" "argocd" {
   name       = "argocd"
@@ -16,7 +38,8 @@ resource "helm_release" "argocd" {
   version    = "8.0.3"  # Specify a stable version of the chart
 
   depends_on = [
-    helm_release.aws_load_balancer_controller
+    helm_release.aws_load_balancer_controller,
+    kubernetes_secret.argocd_github_repo
   ]
 
   # Set ArgoCD server to be accessible via LoadBalancer
