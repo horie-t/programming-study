@@ -7,7 +7,9 @@ authors = [
     { name = "HORIE Tetsuya", email = "horie-t@users.noreply.github.com" }
 ]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "mcp[cli]>=1.9.2",
+]
 
 [project.scripts]
 mcp-server-tf-module-versions = "mcp_server_tf_module_versions:main"
