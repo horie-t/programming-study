@@ -1,0 +1,41 @@
+# Changes to AWS Load Balancer Controller Configuration
+
+## Issue Fixed
+
+The Terraform configuration was failing with the following error:
+
+```
+Error: Invalid function argument
+  
+  on alb_controller.tf line 14, in resource "aws_iam_policy" "aws_load_balancer_controller":
+  14:   policy      = file("${path.module}/iam_policy.json")
+    ├────────────────
+    │ while calling file(path)
+    │ path.module is "."
+ 
+Invalid value for "path" parameter: no file exists at "./iam_policy.json"; this function works only with files that
+are distributed as part of the configuration source code, so if this file will be created by a resource in this
+configuration you must instead obtain this result from an attribute of that resource.
+```
+
+## Solution
+
+The issue was caused by a timing problem in the Terraform configuration. The original code was:
+
+1. Using a `null_resource` with a `local-exec` provisioner to download the IAM policy JSON file during the apply phase
+2. Using the `file()` function to read this file during the planning phase
+3. This failed because the file didn't exist when Terraform tried to read it during planning
+
+The solution was to:
+
+1. Remove the `null_resource` that was downloading the file
+2. Embed the IAM policy JSON directly in the Terraform configuration using heredoc syntax
+3. Update the `depends_on` references to remove the now-deleted `null_resource`
+
+This approach ensures that the IAM policy is available during the planning phase without needing to download an external file.
+
+## Benefits
+
+- The configuration is now self-contained and doesn't rely on external file downloads
+- The `terraform apply` command will now work without errors
+- The solution maintains the same functionality as the original design
