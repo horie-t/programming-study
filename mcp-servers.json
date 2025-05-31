@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "terraformRegistry": {
+      "command": "uv",
+      "args": [
+	"run",
+        "--directory",
+        "/home/tetsuya/repo/mcp-server-tf-module-versions",
+        "mcp-server-tf-module-versions"
+      ]
+    }
+  }
+}
