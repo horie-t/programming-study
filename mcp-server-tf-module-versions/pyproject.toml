@@ -1,0 +1,20 @@
+[project]
+name = "mcp-server-tf-module-versions"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "HORIE Tetsuya", email = "horie-t@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "mcp[cli]>=1.9.2",
+    "python-dotenv>=1.1.0",
+]
+
+[project.scripts]
+mcp-server-tf-module-versions = "mcp_server_tf_module_versions:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
