@@ -28,7 +28,7 @@ mass.mass = mass_value
 mass.velocity = vector(0, 0, 0)  # 初期速度
 
 # 時間の設定
-dt = 0.01  # タイムステップ
+dt = 0.002  # タイムステップ
 t = 0      # 初期時間
 omega = (k / mass.mass) ** 0.5  # 角周波数
 amplitude = mag(initial_position)  # 振幅
