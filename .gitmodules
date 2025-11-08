@@ -1,0 +1,3 @@
+[submodule "introduction-keycloak-2nd/keycloak-book-jp-v2"]
+	path = introduction-keycloak-2nd/keycloak-book-jp-v2
+	url = git@github.com:keycloak-book-jp/keycloak-book-jp-v2.git
