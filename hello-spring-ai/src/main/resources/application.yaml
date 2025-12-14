@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: demo
+  main:
+    web-application-type: none
+  shell:
+    interactive:
+      enabled: true
+  ai:
+    openai:
+      api-key: ${SPRING_AI_OPENAI_API_KEY}
