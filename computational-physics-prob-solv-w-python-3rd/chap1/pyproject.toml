@@ -1,0 +1,9 @@
+[project]
+name = "chap1"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "vpython>=7.6.5",
+]
