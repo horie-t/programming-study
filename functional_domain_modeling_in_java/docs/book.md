@@ -226,3 +226,117 @@ substeps:
       - "send the acknowledgement letter and the priced order to the customer"
 ```
 
+# 3章
+
+## 3.2 境界づけられたコンテストのコミュニケーション
+
+```plantuml
+@startuml
+
+actor Operator
+participant "受注" as Order
+queue "注文確定\nイベントキュー" as OrderPlacedEventQueue
+participant "発送" as Delivery
+queue "発送\nイベントキュー" as DeliveryEventQueue
+
+
+Operator -> Order : 注文を入力する
+Order -> Order: 注文確定ワークフロー
+Order --> OrderPlacedEventQueue : 注文確定イベント
+OrderPlacedEventQueue --> Delivery : 注文確定イベント
+Delivery -> Delivery: 注文発送コマンド
+Delivery -> Delivery : 発送処理ワークフロー
+Delivery --> DeliveryEventQueue : 発送完了イベント
+
+@enduml
+```
+
+## 3.3 境界づけられたコンテキスト間の契約
+
+```plantuml
+@startuml
+digraph G {
+  AddressCheck [shape=ellipse, label="アドレスチェック"];
+  AntiCorrosionLayer [shape=box, label="腐食防止層"];
+  OrderPlace [shape=ellipse, label="受注"];
+  ProductCatalog [shape=ellipse, label="製品カタログ"];
+  Delivery [shape=ellipse, label="発送"];
+  Billing [shape=ellipse, label="請求"];
+
+  AddressCheck -> AntiCorrosionLayer;
+  AntiCorrosionLayer -> OrderPlace;
+  ProductCatalog -> OrderPlace [label="順応者"]; 
+  OrderPlace -> Delivery [label="共有カーネル"];
+  OrderPlace -> Billing [label="コンシューマ駆動"];
+}
+@enduml
+```
+
+## 3.4 境界づけられたコンテキストでのワークフロー
+
+```plantuml
+@startuml
+
+'left to right direction
+
+component "受注" {
+  portin "注文確定\nコマンド" as OrderConfirmedCommand
+  portout "注文確定\nイベント" as OrderConfirmedEvent
+  component [注文確定\nワークフロー] as OrderConfirmedWorkflow
+  
+  
+  portin "注文キャンセル\nコマンド" as OrderCancelledCommand
+  portout "注文キャンセル\nイベント" as OrderCancelledEvent
+  component [注文キャンセル\nワークフロー] as OrderCancelledWorkflow
+  
+  OrderConfirmedCommand -> OrderConfirmedWorkflow
+  OrderConfirmedWorkflow -> OrderConfirmedEvent
+  OrderCancelledCommand -> OrderCancelledWorkflow
+  OrderCancelledWorkflow -> OrderCancelledEvent
+}
+@enduml
+```
+
+### 3.4.2 境界づけられたコンテキスト内ではドメインイベントを避ける
+
+```plantuml
+@startuml
+@startuml
+title 注文確定ワークフロー (Activity Diagram)
+skinparam conditionStyle diamond
+skinparam shadowing false
+
+|入力|
+start
+:注文書を受領;
+
+|ワークフロー|
+partition "注文確定プロセス" {
+    :注文を確定する;
+    
+    :注文を確認する;
+    fork
+        :注文を確認する;
+        |外部システム|
+        :注文確認を顧客に送る;
+    end fork
+    |ワークフロー|
+    fork
+        |メッセージシステム|
+        :注文確認を送った;
+    end fork
+
+    |ワークフロー|
+    
+    fork
+        :請求可能な注文を\n作成する;
+        |メッセージシステム|
+        :注文が確定した;
+        :請求可能な注文が\n確定した;
+    end fork
+}
+
+|ワークフロー|
+stop
+@enduml
+```
