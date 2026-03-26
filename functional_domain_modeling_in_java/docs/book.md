@@ -1,12 +1,12 @@
 # 関数型ドメイン駆動モデリングの読書メモ
 
-# 1章
+# 1章 ドメイン駆動設計の紹介
 
 ### 1.2.2 ドメインを探索する: 受注システム
 
 ![イベントストーミング](./images/event_storming.svg)
 
-# 2章
+# 2章 ドメインのモデリング
 
 ### 2.1.3 インプットとアウトプットを考える
 
@@ -226,7 +226,7 @@ substeps:
       - "send the acknowledgement letter and the priced order to the customer"
 ```
 
-# 3章
+# 3章 関数型アーキテクチャ
 
 ## 3.2 境界づけられたコンテストのコミュニケーション
 
@@ -340,3 +340,186 @@ partition "注文確定プロセス" {
 stop
 @enduml
 ```
+
+# 4章 方の理解
+
+## 4.3 型の合成
+
+### 4.3.1 "AND"型
+
+```fsharp
+type FruitSalad = {
+  Apple: AppleVriety
+  Banana: BananaVriety
+  Cherries: CherriesVriety
+}
+```
+
+```java
+record FruitSalad(AppleVriety apple, 
+                  BananaVriety banana,
+                  CherriesVriety cherries
+) {}
+```
+
+### 4.3.2 "OR"型
+
+```fsharp
+type FruitSnack = 
+  | Apple of AppleVriety
+  | Banana of BananaVriety
+  | Cherries of CherriesVriety
+  
+type AppleVariety =
+  | GoldenDelicious
+  | GrannySmith
+  | Fuji
+
+type BananaVariety =
+  | Cavendish
+  | GrosMichel
+  | Manzano
+
+type CherryVariety =
+  | Montmorency
+  | Bing
+```
+
+```java
+public enum AppleVariety {
+    GoldenDelicious, GrannySmith, Fuji
+}
+
+public enum BananaVariety {
+    Cavendish, GrosMichel, Manzano
+}
+
+public enum CherryVariety {
+    Montmorency, Bing
+}
+
+public sealed interface FruitSnack permits FruitSnack.Apple, FruitSnack.Banana, FruitSnack.Cherries {
+
+    record Apple(AppleVariety variety) implements FruitSnack {}
+    record Banana(BananaVariety variety) implements FruitSnack {}
+    record Cherries(CherryVariety variety) implements FruitSnack {}
+}
+```
+
+### 4.3.3 単純型
+
+```fsharp
+type ProductCode =
+  | ProductCode of string
+```
+
+```java
+record ProductCode(String code) {}
+```
+
+## 4.4 型を扱う
+
+```java
+record Person(String first, String last) {}
+
+public sealed interface OrderQuantity permits OrderQuantity.UnitQuantity, OrderQuantity.KilogramQuantity {
+    record UnitQuantity(int quantity) implements OrderQuantity {}
+    record KilogramQuantity(BigDecimal quantity) implements OrderQuantity {}
+}
+```
+
+## 4.5 型の合成によるドメインモデルの構築
+
+```java
+record CheckNumber(int checkNumber) {}
+record CardNumber(String cardNumber) {}
+```
+
+```java
+public sealed interface CardType permits CardType.Visa, CardType.MasterCard {
+    record Visa(CardNumber cardNumber) implements CardType {}
+    record MasterCard(CardNumber cardNumber) implements CardType {}
+}
+```
+
+```java
+import java.math.BigDecimal;
+
+public sealed interface PaymentMethod permits PaymentMethod.Cash, PaymentMethod.CreditCardInfo, PaymentMethod.CheckNumber {
+    record Cash(int amount) implements PaymentMethod {
+    }
+
+    record CreditCardInfo(CardType cardType) implements PaymentMethod {
+    }
+
+    record CheckNumber(int checkNumber) implements PaymentMethod {
+    }
+}
+
+record PaymentAmount(BigDecimal paymentAmount) {}
+
+public enum Currency {
+    USD,
+    EUR
+}
+
+record Payment(
+        PaymentAmount amount,
+        Currency currency,
+        PaymentMethod method
+) {}
+```
+
+```java
+  @FunctionalInterface
+  public interface PayInvoice {
+      PaidInvoice apply(UnpaidInvoice invoice, Payment payment);
+  }
+
+  // 使用
+  PayInvoice payInvoice = (invoice, payment) -> new PaidInvoice(invoice.invoiceNumber);
+  PaidInvoice result = payInvoice.apply(unpaidInvoice, payment);
+```
+
+## 4.6
+
+### 4.6.1
+
+```java
+record PersonalName(String firstName, Optional<String> middleInitial, String lastName) {}
+```
+
+### 4.6.2
+
+```java
+  Either<String, Integer> success = Either.right(42);
+  Either<String, Integer> failure = Either.left("something went wrong");
+
+ //パターンマッチング相当の操作:
+
+  // F#: match result with | Ok v -> ... | Error e -> ...
+  Either<String, Integer> result = Either.right(42);
+
+  // ① fold — 両ケースを処理して値を返す
+  String message = result.fold(
+      error   -> "Error: " + error,   // Left (失敗)
+      success -> "OK: " + success     // Right (成功)
+  );
+```
+
+```java
+  @FunctionalInterface
+  public interface PayInvoice {
+      Ether<PaidInvoice, PaymentError> apply(UnpaidInvoice invoice, Payment payment);
+  }
+```
+
+```java
+public enum PaymentError {
+    CARD_TYPE_NOT_RECOGNIZED,
+    PAYMENT_REJECTED,
+    PAYMENT_PROVIDERS_OFFLINE
+}
+```
+
+# 5章 型によるドメインモデリング
