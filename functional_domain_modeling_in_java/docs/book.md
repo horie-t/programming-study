@@ -523,3 +523,133 @@ public enum PaymentError {
 ```
 
 # 5章 型によるドメインモデリング
+
+## 5.2 ドメインモデルのパターンを見る
+
+* 単純な値
+* ANDによる組み合わせ
+* ORによる選択肢
+* ワークフロー
+
+#### Javaでのパターン
+
+* 単純な値: recordで表現(ValueObject)
+* ANDによる組み合わせ: recordで表現(Entity, AggregateRoot)
+* ORによる選択肢: sealed interfaceで表現(ValueObject, Entity, AggregateRoot)
+* ワークフロー: Functional Interfaceで表現
+
+## 5.3 単純な値のモデリング
+
+```java
+record CustomerId(int customerId) {}
+```
+
+## 5.4 複雑なデータのモデリング
+
+### 5.4.1 レコード型によるモデリング
+
+Javaの場合、タイトルの通りになる。
+
+```java
+record Order(
+  CustomerInfo customerInfo,
+  ShippingAddress shippingAddress,
+  BillingAddress billingAddress,
+  List<OrderLine> orderLines,
+  Money amountToBill
+) {}
+```
+
+### 5.4.3 選択型によるモデリング
+
+```java
+public sealed interface OrderQuantity permits 
+        OrderQuantity.UnitQuantity, OrderQuantity.KilogramQuantity {
+    record UnitQuantity(int quantity) implements OrderQuantity {}
+    record KilogramQuantity(BigDecimal quantity) implements OrderQuantity {}
+}
+```
+
+## 5.5 関数によるワークフローのモデリング
+
+### 5.5.1 複雑な入力と出力の処理
+
+出力が複数ある場合はrecordで格納する
+
+```java
+record PlaceOrderEvents(
+    AcknowlegementSent acknowlegementSent,
+    OrderPlaced orderPlaced,
+    BillableOrderPlaced billableOrderPlaced
+) {}
+```
+
+ワークフローの型定義
+
+```java
+@FunctionalInterface
+public interface PlaceOrder extends Function<UnvalidatedOrder, PlaceOrderEvents> {
+}
+```
+
+どちらかを出力する場合
+
+```java
+public EnvelopeContents(String envelopeContents) {}
+public sealed interface CategorizedMail 
+        permits CategorizedMail.QuoteForm, CategorizedMail.OrderForm {
+    record QuoteForm(String quoteForm) implements CategorizedMail {}
+    record OrderForm(String orderForm) implements CategorizedMail {}
+}
+
+@FunctionalInterface
+public interface CategorizeInboundMail extends Function<EnvelopeContents, CategorizedMail> {
+}
+```
+
+複数の入力が必要な場合
+
+```java
+import java.util.PrimitiveIterator;
+
+@FunctionalInterface
+public interface CalculatePrices extends BiFunction<OrderForm, ProductCatalog, PricedOrder> {
+}
+```
+
+### 5.5.2 関数シグネチャでエフェクトを文書化する
+
+```java
+@FunctionalInterface
+public interface ValidateOrder extends Function<UnvalidatedOrder, Either<ValidationError, ValidatedOrder>> {
+}
+
+record ValidationError(String fieldName, String errorDescription) {}
+```
+
+非同期の場合
+
+```java
+import java.util.concurrent.CompletableFuture;
+
+@FunctionalInterface
+public interface ValidateOrderAsync
+        extends Function<UnvalidatedOrder, CompletableFuture<Either<ValidationError, ValidatedOrder>>> {
+}
+```
+
+## 5.6 アイデンティティの考察: 値オブジェクト
+
+recordの`equals()`で判定する
+
+```java
+  var widgetCode1 = new WidgetCode("W12345");
+  var widgetCode2 = new WidgetCode("W12345");
+  
+  IO.println(widgetCode1.equals(widgetCode2));
+```
+
+## 5.7 アイデンティティの考察: エンティティ
+
+
+## 5.8 集約
