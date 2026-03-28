@@ -301,7 +301,6 @@ component "受注" {
 
 ```plantuml
 @startuml
-@startuml
 title 注文確定ワークフロー (Activity Diagram)
 skinparam conditionStyle diamond
 skinparam shadowing false
@@ -341,7 +340,7 @@ stop
 @enduml
 ```
 
-# 4章 方の理解
+# 4章 型の理解
 
 ## 4.3 型の合成
 
@@ -651,5 +650,50 @@ recordの`equals()`で判定する
 
 ## 5.7 アイデンティティの考察: エンティティ
 
+```java
+public sealed interface Invoice permits Invoice.UnpaidInvoice, Invoice.PaidInvoice {
+    InvoiceId invoiceId();
+    record UnpaidInvoice(InvoiceId invoiceId) implements Invoice {}
+    record PaidInvoice(InvoiceId invoiceId) implements Invoice {}
+}
+```
+
+```java
+   void someMethod() {
+      var invoice = new Invoice.UnpaidInvoice(new InvoiceId(123));
+      // ...
+    
+      switch (invoice) {
+          case Invoice.UnpaidInvoice unpaidInvoice:
+              System.out.println("The unpaid invoicdId is " + unpaidInvoice.invoiceId());
+              // ...
+          break;
+          case Invoice.PaidInvoice paidInvoice:
+              System.out.println("The paid invoiceId is " + paidInvoice.invoiceId());
+              // ...
+          break;
+      }
+   }
+```
+
 
 ## 5.8 集約
+
+```java
+@FunctionalInterface
+public interface ChangeOrderLinePrice {
+    PricedOrder apply(OrderLine orderLine, OrderLineId orderLineId, Money newPrice);
+}
+```
+
+```java
+@Bean
+public ChangeOrderLinePrice changeOrderLinePrice() {
+    return (orderLine, orderLineId, newPrice) -> {
+        var orderLines = order.orderLines().stream()
+                .map(ol -> ol.orderLineId().equals(orderLineId) ? orderLine.withPrice(newPrice) : ol)
+                .collect(Collectors.toList());
+        return order.withOrderLines(orderLines);
+    };
+}
+```
