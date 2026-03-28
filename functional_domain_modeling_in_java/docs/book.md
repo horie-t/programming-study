@@ -697,3 +697,200 @@ public ChangeOrderLinePrice changeOrderLinePrice() {
     };
 }
 ```
+
+# 6章 ドメインの完全性と整合性
+
+## 6.1 単純な値の完全性
+
+```java
+import io.vavr.control.Either;
+import lombok.Builder;
+
+@With
+@Builder
+public record UnitQuantity(int qty) {
+    public UnitQuantity {
+        if (qty < 1) {
+            throw new IllegalArgumentException("UnitQuantity can not be negative");
+        }
+        if (qty > 1000) {
+            throw new IllegalArgumentException("UnitQuantity can not be more than 1000");
+        }
+    }
+    
+    public static class UnitQuantityBuilder {
+        
+        public Either<String, UnitQuantity> safeBuild() {
+            try {
+                return Either.right(build());
+            } catch (IllegalArgumentException e) {
+                return Either.left(e.getMessage());
+            }
+        }
+        
+        private UnitQuantity build() {
+            return new UnitQuantity(qty);
+        }
+    }
+}
+```
+
+```java
+private void someMethod() {
+    var unitQuantity = UnitQuantity.builder().qty(100).safeBuild();
+    unitQtyResult.fold(
+            msg -> {
+                System.out.printf("Failure, Message is %s%n", msg);
+                return null;
+            },
+            uQty -> {
+                System.out.printf("Success. Value is %s%n", uQty);
+                int innerValue = uQty.qty();
+                System.out.printf("innerValue is %d%n", innerValue);
+                return null;
+            }
+    );
+}
+```
+
+## 6.2 測定単位
+
+```xml
+  <dependency>
+      <groupId>tech.units</groupId>
+      <artifactId>indriya</artifactId>
+      <version>2.2</version>
+  </dependency>
+```
+
+```java
+public class IndriyaDemo {
+
+    public static void main(String[] args) {
+        // 基本的な単位の生成
+        Quantity<Length> distance = Quantities.getQuantity(100, Units.METRE);
+        System.out.println("distance: " + distance);
+
+        // 単位変換
+        Quantity<Length> inKm = distance.to(MetricPrefix.KILO(Units.METRE));
+        System.out.println("in km: " + inKm);
+
+        Quantity<Length> inMm = distance.to(MetricPrefix.MILLI(Units.METRE));
+        System.out.println("in mm: " + inMm);
+
+        // 演算
+        Quantity<Mass> m1 = Quantities.getQuantity(5.0, Units.KILOGRAM);
+        Quantity<Mass> m2 = Quantities.getQuantity(3.0, Units.KILOGRAM);
+        Quantity<Mass> total = m1.add(m2);
+        System.out.println("total mass: " + total);
+
+        // 速度 = 距離 / 時間
+        Quantity<Length> d = Quantities.getQuantity(100, Units.METRE);
+        Quantity<Time> t = Quantities.getQuantity(10, Units.SECOND);
+        Quantity<?> speed = d.divide(t);
+        System.out.println("speed: " + speed);
+
+        // km/h への変換
+        Quantity<Speed> speedKmh = Quantities.getQuantity(3.6, Units.KILOMETRE_PER_HOUR);
+        System.out.println("speed in km/h: " + speedKmh);
+
+        // 異なる単位同士の加算（自動変換される）
+        Quantity<Length> km3 = Quantities.getQuantity(3, MetricPrefix.KILO(Units.METRE));
+        Quantity<Length> m500 = Quantities.getQuantity(500, Units.METRE);
+        Quantity<Length> sum = km3.add(m500);
+        System.out.println("3 km + 500 m = " + sum);
+        System.out.println("in km: " + sum.to(MetricPrefix.KILO(Units.METRE)));
+        System.out.println("in m:  " + sum.to(Units.METRE));
+
+        // 型安全: 以下はコンパイルエラーになる
+        // Quantity<Length> invalid = m1.add(d); // Mass + Length は不可
+    }
+}
+```
+
+## 6.3 型システムによる不変条件の強制
+
+```java
+import io.vavr.collection.List;
+import io.vavr.control.Either;
+
+public record NonEmptyList<T>(T head, List<T> tail) {
+
+    public NonEmptyList {
+        if (head == null) {
+            throw new IllegalArgumentException("head must not be null");
+        }
+    }
+
+    public static <T> Either<String, NonEmptyList<T>> create(List<T> list) {
+        if (list.isEmpty()) {
+            return Either.left("list must not be empty");
+        }
+        return Either.right(new NonEmptyList<>(list.head(), list.tail()));
+    }
+
+    public static <T> NonEmptyList<T> of(T head, @SuppressWarnings("unchecked") T... rest) {
+        return new NonEmptyList<>(head, List.of(rest));
+    }
+
+    public List<T> toList() {
+        return tail.prepend(head);
+    }
+
+    public int size() {
+        return 1 + tail.size();
+    }
+}
+
+void someMethod() {
+    // 使用例
+    var nel = NonEmptyList.of("Alice", "Bob", "Charlie");
+    System.out.println(nel.head());     // Alice
+    System.out.println(nel.toList());   // List(Alice, Bob, Charlie)
+    System.out.println(nel.size());     // 3
+    
+    // スマートコンストラクタ
+    Either<String, NonEmptyList<String>> ok = NonEmptyList.create(List.of("A", "B"));
+    System.out.println(ok); // Right(NonEmptyList[head=A, tail=List(B)])
+    
+    Either<String, NonEmptyList<String>> ng = NonEmptyList.create(List.empty());
+    System.out.println(ng); // Left(list must not be empty)
+}
+```
+
+## 6.4 ビジネスルールを型システムで表現する
+
+```java
+record EmailAddress(String email) {}
+
+public sealed interface CustomerEmail permits CustomerEmail.Verified, CustomerEmail.Unverified {
+    record Verified(EmailAddress emailAddress) implements CustomerEmail {}
+    record Unverified(EmailAddress emailAddress) implements CustomerEmail {}
+}
+```
+
+```java
+public sealed interface ContactInfo permits ContactInfo.BothContractMethods, ContactInfo.PostalOnly, ContactInfo.EmailOnly {
+    record EmailContactInfo(String emailAddress) {
+    }
+
+    record PostalContactInfo(String address) {
+    }
+
+    record BothContractMethods(EmailContactInfo email, PostalContactInfo postal) {
+    }
+}
+
+public record Contract(
+        Name name,
+        ContactInfo contactInfo
+) {}
+```
+
+## 6.5 整合性
+
+なし。
+
+## 6.6 まとめ
+
+なし。
