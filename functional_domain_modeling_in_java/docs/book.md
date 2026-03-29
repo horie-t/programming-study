@@ -894,3 +894,166 @@ public record Contract(
 ## 6.6 まとめ
 
 なし。
+
+# 7章 パイプラインによるワークフローのモデリング
+
+```yaml
+- workflows:
+    - name: "Place Order"
+      input: UnvalidatedOrder
+      output: 
+        oneOf:
+          - [OrderAcknowledgementSent, OrderPlaced, BillableOrderPlaced]
+          - ValidationError
+      steps:
+        - do ValidateOrder
+        - when:
+            - "Order is invalid"
+          then:
+            - return: ValidationError
+              
+        - do PlaceOrder
+        - do AcknowledgeOrder
+        - create and return the events
+```
+
+## 7.1 ワークフローの入力
+
+```java
+/**
+ * 未確認の注文
+ * @param orderId
+ * @param customerInfo
+ * @param shippingAddress
+ */
+public record UnvalidatedOrder(
+        String orderId,
+        CustomerInfo customerInfo,
+        ShippingAddress shippingAddress
+        // ...
+) {}
+```
+
+### 7.1.1 入力としてのコマンド
+
+```java
+public record PlaceOrder(
+        UnvalidatedOrder orderForm,
+        Instant timestamp,
+        UserId userId
+        // ...
+) {}
+```
+
+### 7.1.2 ジェネリクスによる共通構造の共有
+
+```java
+public class Command<T>(
+        T data,
+        Instant timestamp,
+        UserId userId
+        // ...
+){}
+```
+
+### 7.1.3 複数のコマンドを1つの型にまとめる
+
+メッセージ・チャネルから受け取る場合に有用
+
+```java
+package com.example.eshop.shell.adapter.in.command;
+
+public sealed interface OrderTakingCommand 
+        permits OrderTakingCommand.Place, OrderTakingCommand.Change, OrderTakingCommand.Cancel {
+    final class Place extends Command<UnvalidatedOrder> implements OrderTakingCommand {}
+    final class Change extends Command<UnvalidatedChangeOrder> implements OrderTakingCommand {}
+    final class Cancel extends Command<UnvalicatedCancelOrder> implements OrderTakingCommand {}
+}
+```
+
+## 7.2 状態の集合による注文のモデリング
+
+```plantuml
+left to right direction
+
+[*] --> 未処理の注文書
+未処理の注文書 --> 未検証の注文
+未処理の注文書 --> 未検証の見積り
+未検証の注文 --> 検証済みの注文
+検証済みの注文 --> 価格計算済みの注文
+検証済みの注文 --> 無効な注文
+```
+
+```java
+public record UnvalidatedOrder() {}
+public record ValidatedOrder() {}
+public record PricedOrder() {}
+
+public sealed interface Order 
+        permits Order.UnvalidatedOrder, Order.ValidatedOrder, Order.PricedOrder {
+    record UnvalidatedOrder() implements Order {}
+    record ValidatedOrder() implements Order {}
+    record PricedOrder() implements Order {}
+}
+```
+
+## 7.3 ステートマシン
+
+### 7.3.2
+
+```java
+public class Item {
+    String sku;
+}
+
+public class ActiveCartData {
+    List<Item> unpaidItems;
+}
+public class PaidCartData {
+    List<Item> paidItems;
+    float paymentAmount; 
+}
+
+public sealed interface ShoppingCart 
+        permits ShoppinCart.EmptyCart, ShoppingCart.ActiveCart, ShoppingCart.PaidCart {
+    final class EmptyCart {
+    }
+
+    final class ActiveCart extends ActiveCartData implements ShoppingCart {
+    }
+
+    final class PaidCart extends PaidCartData implements ShoppingCart {
+    }
+}
+```
+
+```java
+import org.springframework.context.annotation.Bean;
+
+import java.util.function.BiFunction;
+
+@Configuration
+public class CartConfig {
+    @Bean
+    public BiFunction<ShoppingCart, Item, ShoppingCart> addItem() {
+        return (cart, item) ->
+                switch (cart) {
+                    case EmptyCart emptyCart -> new ActiveCart(List.of(item));
+                    case ActiveCart activeCart -> new ActiveCart(activeCart.unpaidItems().append(item));
+                    case PaidCart _ -> cart; // 無視
+                };
+    }
+
+    @Bean
+    public BiFunction<ShoppingCart, Float> makePayment() {
+        return (cart, paymentAmount) ->
+                switch (cart) {
+                    case EmptyCart emptyCart -> emptyCart;
+                    case ActiveCart activeCart -> new PaidCart(activeCart.unpaidItems(), paymentAmount);
+                    case PaidCart _ -> cart; // 無視
+                }
+    }
+}
+```
+
+
