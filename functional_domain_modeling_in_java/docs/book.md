@@ -1161,3 +1161,85 @@ public interface CreateEvents {
 }
 ```
 
+## 7.5 エフェクトの文書化
+
+### 7.5.1 検証ステップでのエフェクト
+
+非同期の結果
+
+```java
+public class CompletableEther<L, R>  extends CompletableFuture<Either<L, R>> {
+}
+```
+
+シグネチャの変更
+
+```java
+@FunctionalInterface
+public interface ValidateOrder {
+    ComparableEther<ValidationError, ValidateOrder> apply(CheckPorductCodeExists checkProductCodeExists,
+                                                 CheckAddressExists checkAddressExists,
+                                                 UnvalidatedOrder orderForm);
+}
+```
+
+### 7.5.2 価格設定ステップでのエフェクト
+
+```java
+public record PricingError(String message) {}
+
+@FunctionalInterface
+public interface PriceOrder {
+    Ether<PricingError, PricedOrder> apply(GetProductPrice getProductPrice, ValidatedOrder order);
+}
+```
+
+### 7.5.3 確認ステップでのエフェクト
+
+```java
+@FunctionalInterface
+public interface SendOrderAcknowledgement {
+    CompletableFuture<SendResult> apply(OrderAcknowledgement orderAcknowledgement);
+}
+
+@FunctionalInterface
+public interface AcknowledgeOrder {
+    CompletableFuture<Optional<OrderAcknowledgementSent>> apply(CreateOrderAcknowledgementLetter createOrderAcknowledgementLetter,
+                                             SendOrderAcknowledgement sendOrderAcknowledgement,
+                                             PricedOrder order);
+}
+```
+
+## 7.6 ステップからワークフローを合成する
+
+依存関係を取り除いたインタフェースを書いて一覧にしてみる。
+
+```java
+@FunctionalInterface
+public interface ValidateOrder {
+    ComparableEther<ValidationError, ValidateOrder> apply(UnvalidatedOrder orderForm);
+}
+
+@FunctionalInterface
+public interface PriceOrder {
+    Ether<PricingError, PricedOrder> apply(ValidatedOrder order);
+}
+
+@FunctionalInterface
+public interface AcknowledgeOrder {
+    CompletableFuture<Optional<OrderAcknowledgementSent>> apply(PricedOrder order);
+}
+```
+
+上記は単純には繋がらない。
+
+## 7.7 依存関係は設計の一部ですか?
+
+```java
+@FunctionalInterface
+public interface PlaceOrderWorkflow {
+    CompletableFuture<Either<PlaceOrderError, List<PlaceOrderEvent>>> apply(PlaceOrderCommand command);
+}
+```
+
+## 7.8 パイプラインの完成形
