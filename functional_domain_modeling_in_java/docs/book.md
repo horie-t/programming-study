@@ -1056,4 +1056,108 @@ public class CartConfig {
 }
 ```
 
+## 7.4 型を使ったワークフローの各ステップのモデリング
+
+### 7.4.1 検証のステップ
+
+製品コードの存在チェック
+
+```java
+@FunctionalInterface
+public interface CheckProductCodeExists {
+    Boolean apply(ProductCode productCode);
+}
+```
+
+住所の存在チェック
+
+```java
+public CheckedAddress(UnValidatedAddress address) {}
+
+@FunctionalInterface
+public interface CheckAddressExists {
+    Either<AddressValidationError, CheckedAddress> apply(UnValidatedAddress address);
+}
+```
+
+注文の検証
+
+```java
+@FunctionalInterface
+public interface ValidateOrder {
+    Either<ValidationError, ValidateOrder> apply(CheckPorductCodeExists checkProductCodeExists,
+                                                 CheckAddressExists checkAddressExists,
+                                                 UnvalidatedOrder orderForm);
+}
+```
+
+### 7.4.2 価格設定のステップ
+
+```java
+@FunctionalInterface
+public interface GetProductPrice {
+    Price apply(ProductCode productCode);
+}
+
+@FunctionalInterface
+public interface PriceOrder {
+    PricedOrder apply(GetProductPrice getProductPrice, ValidatedOrder order);
+}
+```
+
+### 7.4.3 注文確認のステップ
+
+```java
+public record HtmlString(String html) {}
+
+public record OrderAcknowledgement(EmailAddress emailAddress, HtmlString html) {}
+
+@FunctionalInterface
+public interface CreateOrderAcknowledgementLetter {
+    HtmlString apply(PricedOrder order);
+}
+
+```
+
+```java
+public enum SendResult {
+    SENT,
+    NOT_SENT
+}
+
+@FunctionalInterface
+public interface SendOrderAcknowledgement {
+    SendResult apply(OrderAcknowledgement orderAcknowledgement);
+}
+```
+
+```java
+public record OrderAcknowledgementSent(OrderId orderId, EmailAddress emailAddress) {}
+
+@FunctionalInterface
+public interface AcknowledgeOrder {
+    Optional<OrderAcknowledgementSent> apply(CreateOrderAcknowledgementLetter createOrderAcknowledgementLetter,
+                                             SendOrderAcknowledgement sendOrderAcknowledgement,
+                                             PricedOrder order);
+}
+```
+
+### 7.4.4 返すイベントを作る
+
+```java
+public sealed interface PlaceOrderEvent 
+        permits OrderPlaced, BillableOrderPlaced, OrderAcknowledgementSent {
+
+}
+
+public record OrderPlaced(PricedOrder order) implements PlaceOrderEvent {}
+public record BillableOrderPlaced(OrderId orderId, BillingAddress billingAddress, 
+                                  AmoutToBill amountToBill) implements PlaceOrderEvent{}
+public record OrderAcknowledgement(EmailAddress emailAddress, HtmlString html) implements PlaceOrderEvent {}
+
+@FunctionalInterface
+public interface CreateEvents {
+    List<PlaceOrderEvent> apply(PricedOrder order);
+}
+```
 
