@@ -1243,3 +1243,76 @@ public interface PlaceOrderWorkflow {
 ```
 
 ## 7.8 パイプラインの完成形
+
+## 7.9 長時間稼働するワークフロー
+
+## 7.10 まとめ
+
+## 7.11 次にやること
+
+# 8章 関数の理解
+
+## 8.1 関数、関数、どこにでも
+
+## 8.2 「もの」としての関数
+
+### 8.2.1 Javaで関数を「もの」として扱う
+
+```java
+Function<Integer, Integer> plus3 = x -> x + 3;
+Function<Integer, Integer> times2 = x -> x * 2;
+Function<Integer, Integer> square = x -> x * x;
+Function<Integer, Integer> addThree = plus3;
+
+var listOfFunctions = List.of(plus3, times2, square);
+```
+
+### 8.2.2 入力としての関数
+
+```java
+Function<Function<Integer, Integer>, Integer> evalWith5ThenAdd2 = f -> f.apply(5) + 2;
+```
+
+### 8.2,3 出力としての関数
+
+```java
+Function<Integer, Function<Integer, Integer>> adderGenerator = numberToAdd -> (x -> numberToAdd + x);
+var add1 = adderGenerator.apply(1);
+add1.apply(2);
+// $12 ==> 3
+```
+
+### 8.2.4 カリー化
+
+### 8.2.5 部分適用
+
+```java
+BiFunction<String, String, Void> sayGreeting = (greeting, name) -> {IO.println(String.format("%s %s", greeting, name)); return null;};
+Function<String, Void> sayHello = name -> sayGreeting.apply("Hello", name);
+sayHello.apply("John");
+// -> Hello John
+```
+
+## 8.3 全域関数
+
+```java
+Function<Integer, Optional<Integer>> twelveDivideBy = n -> switch (n) {
+    case 6, 5 -> Optional.of(2);
+    case 4 -> Optional.of(3);
+    //
+    case 0 -> Optional.empty();
+    default -> Optional.of(12 / n);
+};
+```
+
+## 8.4 関数合成
+
+### 8.4.1 Javaにおける関数の合成
+
+```java
+Function<Integer, Integer> add1ThenSquare = add1.andThen(square);
+add1ThenSquare.apply(5);
+// $2 ==> 36
+```
+
+## 8.5 まとめ
