@@ -1316,3 +1316,197 @@ add1ThenSquare.apply(5);
 ```
 
 ## 8.5 まとめ
+
+# 9章 実装: パイプラインの合成
+
+```java
+package com.example.eshop.port.in.order;
+
+@FunctionalInterface
+public interface PlaceOrder {
+    CompletableFuture<Either<PlaceOrderError, List<PlaceOrderEvent>>> apply(UnvalidatedOrder orderForm);
+}
+```
+
+```java
+package com.example.eshop.application.order;
+
+@Configuration
+public class Order {
+    @Bean
+    public PlaceOrder placeOrder() {
+        return orderForm -> validateOrder
+                .andThen(priceOrder)
+                .andThen(acknowledgeOrder)
+                .andThen(createEvents);
+    }
+}
+```
+
+## 9.1 単純型を扱う
+
+```java
+package com.example.eshop.domain.model.order;
+
+public record OrderId(string value) {
+    public OrderId(String value) {
+        if (Strings.isNullOrEmpty(value) || value.isBlank()) {
+            throw new IllegalArgumentException("value must not be null or empty");
+        } else if (value.length() > 50) {
+            throw new IllegalArgumentException("value must not be longer than 50 characters");
+        } else {
+            this.value = value;
+        }
+    }
+}
+```
+
+## 9.2 関数の型から実装を導く
+
+```java
+package com.example.eshop.domain.service.order;
+
+@FunctionalInterface
+public interface ValidateOrder {
+    ValidateOrder apply(CheckPorductCodeExists checkProductCodeExists,
+                        CheckAddressExists checkAddressExists,
+                         UnvalidatedOrder orderForm);
+}
+```
+
+## 9.3 検証ステップの実装
+
+F#での関数のtypeの宣言は `@FunctionalInterface` で良さそう。
+
+```java
+package com.example.eshop.domain.service.order; // orderではないかも
+
+@FunctionalInterface
+public interface CheckAddressExists { 
+    CheckedAddress apply(UnValidatedAddress address);
+}
+```
+
+```java
+@FunctionalInterface
+public interface ValidateOrder {
+    ValidateOrder apply(CheckPorductCodeExists checkProductCodeExists,
+                        CheckAddressExists checkAddressExists,
+                        UnvalidatedOrder unvalidatedOrder);
+}
+```
+
+```java
+@Configuration
+public class ValidateOrderConfig {
+    @Bean
+    public ValidateOrder validateOrder() {
+        return (checkProductCodeExists, checkAddressExists, unvalidatedOrder) -> {
+            var orderId = OrderId.of(orderForm.orderId());
+            var customerInfo = toCustomerInfo(unvalidatedOrder.customerInfo());
+            var shippingAddress = toShippingAddress(unvalidatedOrder.shippingAddress());
+            // ...
+            return new ValidatedOrder(orderId, customerInfo, sippingAddress /* , ...*/);
+        };
+    }
+    
+    private CustomerInfo toCustomerInfo(UnvalidatedCustomerInfo unvalidatedCustomerInfo) {
+        var firstName = Stirng50.create(unvalidatedCustomerInfo.firstName());
+        var lastName = Stirng50.create(unvalidatedCustomerInfo.lastName());
+        var emailAddress = EmailAddress.create(unvalidatedCustomerInfo.emailAddress());
+        var name = Name.create(firstName, lastName);
+        return CustomerInfo.create(name, emailAddress);
+    }
+}
+```
+
+### 9.3.1 検証されたチェック済み住所の作成
+
+```java
+    private Address toAddress(CheckAddressExists checkAddressExists, 
+                                            UnValidatedAddress unValidatedAddress) {
+        var checkedAddress = checkAddressExists.apply(unValidatedAddress);
+        var addressLine1 = String50.create(checkedAddress.addressLine1());
+        var addressLine2 = String50.createOption(checkedAddress.addressLine2());
+        var addressLine3 = String50.createOption(checkedAddress.addressLine3());
+        var addressLine4 = String50.createOption(checkedAddress.addressLine4());
+        var city = String50.create(checkedAddress.city());
+        var zipCode = String50.create(checkedAddress.zipCode());
+        var country = String50.create(checkedAddress.country());
+        return new Address(addressLine1, addressLine2, addressLine3, addressLine4,
+                city, zipCode);
+    }
+```
+
+```java
+    @Bean
+    public ValidateOrder validateOrder() {
+        return (checkProductCodeExists, checkAddressExists, unvalidatedOrder) -> {
+            var orderId = OrderId.of(orderForm.orderId());
+            var customerInfo = toCustomerInfo(unvalidatedOrder.customerInfo());
+            var shippingAddress = toShippingAddress(checkAddressExists, unvalidatedOrder.shippingAddress());
+            // ...
+            return new ValidatedOrder(orderId, customerInfo, sippingAddress /* , ...*/);
+        };
+    }
+
+```
+
+### 9.3.2 明細行の作成
+
+```java
+private ValidatedOrderLine toValidatedOrderLine(CheckProductCodeExists checkProductCodeExists, 
+                                                UnvalidatedOrderLine unvalidatedOrderLine) {
+    var orderLineId = OrderLineId.of(unvalidatedOrderLine.orderLineId());
+    var productCode = toProductCode(unvalidatedOrderLine.productCode());
+    var quantity = toOrderQuantity(unvalidatedOrderLine.quantity());
+    return new ValidatedOrderLine(orderLineId, productCode, quantity);
+}
+```
+
+```java
+private ValidateOrder validateOrder() {
+    return (checkProductCodeExists, checkAddressExists, unvalidatedOrder) -> {
+        // var orderId = ...
+        // var customerInfo = ...
+        // var shippingAddress = ...
+        // ...
+        var orderLines = unvalidatedOrder.orderLines()
+                .map(orderLine -> toValidatedOrderLine(checkProductCodeExists, orderLine))
+                .toList();
+        // ...
+        return new ValidatedOrder(orderId, customerInfo, sippingAddress /*, ... */);
+    };
+}
+```
+
+```java
+import org.springframework.core.annotation.Order;
+
+private OrderQuauntity toOrderQuantity(ProductCode productCode, Quantity quantity) {
+    switch (productCode) {
+        case Widget _ -> new UnitQuatity(quantity.value().toInt());
+        case Gadget _ -> new KilogramQuantity(quantity.value().toInt());
+    }
+}
+```
+
+### 9.3.3 関数アダプターの作成
+
+```java
+static <T> UnaryOperator<T> predicateToPassthru(String errorMsg, Predicate<T> f) {
+    return x -> {
+        if (f.test(x)) return x;
+        throw new RuntimeException(errorMsg);
+    };
+}
+
+private ProductCode toProductCode(CheckPorductCodeExists checkProductCodeExists, ProductCode productCode) {
+    Function<ProductCode, ProductCode> checkProduct = productCode -> {
+        var errorMessage = String.format("Product code %s does not exist", productCode);
+        predicateToPassthru(errorMessage, checkProductCodeExists).apply(productCode);
+    };
+    
+    return checkProduct.apply(new ProductCode(productCode));
+}
+```
