@@ -1510,3 +1510,78 @@ private ProductCode toProductCode(CheckPorductCodeExists checkProductCodeExists,
     return checkProduct.apply(new ProductCode(productCode));
 }
 ```
+
+## 9.4 残りのステップの実装
+
+コードは省略
+
+### 9.4.1 確認ステップの実装
+
+コードは省略
+
+### 9.4.2 イベントの作成
+
+```java
+public sealed interface PlaceOrderEvent permits OrderPlaced, BillableOrderPlaced, OrderAcknowledgementSent {
+    
+}
+
+public record OrderPlaced(PricedOrder order) 
+        implements PlaceOrderEvent {}
+
+public record BillableOrderPlaced(OrderId orderId, BillingAddress billingAddress, AmoutToBill amountToBill) 
+        implements PlaceOrderEvent{}
+
+public record OrderAcknowledgement(EmailAddress emailAddress, HtmlString html) 
+        implements PlaceOrderEvent {}
+```
+
+```java
+import java.util.Optional;
+
+@FunctionalInterface
+public interface CreateEvents {
+    List<PlaceOrderEvent> apply(PricedOrder order, Option<OrderAcknowledgementSent> orderAcknowledgementSent);
+}
+```
+
+```java
+
+@FunctionalInterface
+public interface CreateBillingEvent {
+    Optional<BillableOrderPlaced> apply(PricedOrder order);
+}
+```
+
+```java
+CreateBillingEvent createBillingEvent = placedOder -> {
+    var billingAmount = new BillingAmout(placedOder.amountToBill());
+    if (billingAmount.value() > 0) {
+        return Optional.of(new BillableOrderPlaced(order.orderId(), order.billingAddress(), placedOder.amountToBill()));
+    } else {
+        return Optional.empty();
+    }
+};
+```
+
+```java
+Function<Option<PlaceOrderEvent>, List<PlaceOrderEvent>> createEvents = order -> {
+    order.map(List::of).getOrElse(List.of());
+};
+
+CreateEvents createEvents = (pricedOrder, orderAcknowledgementSentOption) -> {
+    var events1 = Option.some(pricedOrder)
+            .map(OrderPlaced::new)
+            .map(createEvents);
+    var events2 = orderAcknowledgementSentOption
+            .map(AccpetOrderAcknowledgementSent::new)
+            .map(createEvents);
+    var events3 = Option.some(pricedOrder)
+            .map(BillableOrderPlaced::new)
+            .map(createBillingEvent)
+            .map(createEvents);
+    return Stream.of(events1, events2, events3)
+            .flatMap(Collection::stream)
+            .toList();
+};
+```
