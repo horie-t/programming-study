@@ -1585,3 +1585,51 @@ CreateEvents createEvents = (pricedOrder, orderAcknowledgementSentOption) -> {
             .toList();
 };
 ```
+
+## 9.5 パイプラインのステップを1つに合成する
+
+```java
+@FunctionalInterface
+public interface PlaceOrderWorkflow {
+    List<PlaceOrderEvent> apply(UnvalidatedOrder unvalidatedOrder);;
+}
+```
+
+```java
+PlaceOrderWorkflow placeOrder = unvalidatedOrder -> {
+    Option.some(unvalidatedOrder)
+            .map(validateOrder)
+            .map(priceOrder)
+            .map(acknowledgeOrder)
+            .map(createEvents)
+            .getOrElse(List.of());
+};
+```
+
+
+```java
+@FunctionalInterface
+public interface ValidateOrder extends Function3<CheckPorductCodeExists, CheckAddressExists, UnvalidatedOrder,
+        ValidateOrder> {
+}
+```
+
+```java
+var validatedOrderWithDependenciesBackedIn = validateOrder.apply(checkProductCodeExists, checkAddressExists);
+```
+
+```java
+PlaceOrderWorkflow placeOrder = unvalidatedOrder -> {
+    var validatedOrderWithDependenciesBackedIn = validateOrder.apply(checkProductCodeExists, checkAddressExists);
+    var priceOrderWithDependenciesBackedIn = priceOrder.apply(getProductPrice);
+    var acknowledgeOrderWithDependenciesBackedIn = acknowledgeOrder.apply(createOrderAcknowledgementLetter, sendOrderAcknowledgement);
+    
+    return Option.some(unvalidatedOrder)
+            .map(validateOrderWithDependenciesBackedIn)
+            .map(priceOrderWithDependenciesBackedIn)
+            .map(acknowledgeOrderWithDependenciesBackedIn)
+            .map(createEvents)
+            .get();
+};
+```
+
