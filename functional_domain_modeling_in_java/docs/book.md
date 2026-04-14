@@ -1813,3 +1813,47 @@ Either<FruitError, Lemon> result = Either.<FruitError, Apple>right(apple)
         .flatMap(b -> functionB.apply(b).mapLeft(FruitError.Banana::new))
         .flatMap(c -> functionC.apply(c).mapLeft(FruitError.Cherry::new));
 ```
+
+## 10.4 パイプラインでのbindとmapの使用
+
+EitherのflatMap()とmap()に対応する。
+
+## 10.5 他の種類の関数を2トラックモデルに適合させる
+
+### 10.5.1 例外の処理
+
+flatMapで連鎖させる。
+
+```java
+Either<String, String> result = Either.<String, String>right("123")
+    .flatMap(str ->
+        Try.of(() -> Integer.parseInt(str))
+           .toEither()
+           .mapLeft(Throwable::getMessage)
+    )
+    .map(n -> "Parsed: " + n);
+```
+
+recover / recoverWith でドメインの例外だけ処理
+
+```java
+Try<Integer> result = Try.of(() -> riskyOperation())
+    .recover(NumberFormatException.class, e -> 0)        // 特定の例外だけ回復
+    .recover(IllegalArgumentException.class, e -> -1);   // 別の例外も個別に処理
+```
+
+### 10.5.2 行き止まりの関数の処理
+
+peek()を使う
+
+```java
+Either<FruitError, Lemon> result = FruitEither.right(apple)
+        .flatMap(functionA)
+        .peek(banana -> log.info("Got banana: {}", banana))  // void処理を挟む
+        .flatMap(functionB)
+        .peek(cherry -> log.info("Got cherry: {}", cherry))  // void処理を挟む
+        .flatMap(functionC)
+        .toEither();
+```
+
+
