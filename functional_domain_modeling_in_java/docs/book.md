@@ -1655,5 +1655,161 @@ spring-test等のSpringのフレームワークに逆らわすに・・・
 
 まとめ
 
+# 10章 実装: エラーの扱い
 
+## 10.1 Result型を使ってエラーを明示する
 
+```java
+@FunctionalInterface
+public interface CheckAddressExists {
+    CheckedAddress apply(UnvalidatedAddress address);
+}
+```
+
+エラーが明示されていないため、あまり役に立たない。全域関数であることが望ましい。以下のようにEither型を使って明確化する。
+
+```java
+@FunctionalInterface
+public interface CheckAddressExists {
+    Either<AddressValidationError, CheckedAddress> apply(UnvalidatedAddress address);
+}
+```
+
+```java
+public sealed interface AddressValidationError permits InvalidFormat, AddressNotFound {
+    record InvalidFormat(String message) implements AddressValidationError {}
+    record AddressNotFound(String message) implements AddressValidationError {}
+}
+```
+
+## 10.2 ドメインエラーを扱う
+
+エラーの分類
+
+* ドメインエラー: ビジネスプロセスの一部として予想されるエラー
+* パニック:メモリ不足等の処理不可能なシステムエラー
+* インフラストラクチャエラー: ネットワークタイムアウトなどのアーキテクチャの一部として予想されるエラー
+
+ドメインエラーか否かを迷うときは、ドメイン・エキスパートにエラーの事象について説明して何のことかわからなければドメインエラーではないと判断する。
+
+**パニック**
+
+パニックは例外を発生させて、mainに近い部分で補足するのがよい。
+
+```java
+var workflowPart2 = input -> {
+    if (input == 0) {
+        throw new DevideByZeroException("input must not be zero");
+    }
+    // ...
+};
+```
+
+```java
+void main(String[] args) {
+    try {
+        var result1 = workflow1();
+        var result2 = workflow2(resut1);
+    } catch (DevideByZeroException e) {
+        System.err.println(e.getMessage());
+        // ...
+    } catch (Exception e) {
+        System.err.println(e.getMessage());
+        // ....
+    } catch (OutOfMemoryError e) {
+        System.err.println(e.getMessage());
+    }
+}
+```
+
+インフラストラクチャエラーはドメインエラーと同様の扱いの方が望ましい。ドメインエキスパートやプロダクトオーナーと話をすべきエラーだから。
+
+### 10.2.1 型によるドメインエラーのモデリング
+
+```java
+public sealed interface PlaceOrderError permits ValidationError, ProductOutOfStock, RemoteServiceError {
+    record ValidationError(String message) implements PlaceOrderError {}
+    record ProductOutOfStock(PorductCode productCode) implements PlaceOrderError {}
+    record RemoteServiceError(ErrorMessage errorMessage) implements PlaceOrderError {}
+}
+```
+
+エラーはアプリケーションを開発している中で見えてくる。
+
+### 10.2.2 エラー処理はコードの見た目を悪くする
+
+Goっぽい、見た目の悪いコード。
+
+## 10.3 Resultを生成する関数の連鎖
+
+Eitherをうまく接続するアダプターブロックが必要。
+
+### 10.3.1 アダプターブロックの実装
+
+Eitherを使うので実装については検討しない。
+
+### 10.3.2 Result関数の整理
+
+vavrのライブラリ内に整理済み
+
+### 10.3.3 合成と型チェック
+
+```java
+@FunctionalInterface
+public interface FunctionA {
+    Either<AppleError, Bananas> apply(Apple apple);
+}
+
+@FunctionalInterface
+public interface FunctionB {
+    Either<BananaError, Cherries> apply(Banana banana);
+}
+
+@FunctionalInterface
+public interface FunctionC {
+    Either<CherryError, Lemons> apply(Cherry cherry);
+}
+```
+
+以下のようにしたい。
+
+```java
+FunctionA functionA = apple -> {
+    // ...
+    return Either.right(banana);
+};
+
+FunctionB functionB = banana -> {
+    // ...
+    return Either.right(cherry);
+};
+
+FunctionC functionC = cherry -> {
+    // ..
+    return Either.right(lemon);
+};
+
+FunctionABC functionABC = Either.right(apple)
+        .flatMap(functionA)
+        .flatMap(functionB)
+        .flatMap(functionC);
+```
+
+エラー型が一致しない。
+
+### 10.3.4 共通のエラー型に変換する
+
+```java
+public sealed interface FruitError permits FruitError.Apple, FruitError.Banana, FruitError.Cherry {
+    record Apple(AppleError error) implements FruitError {}
+    record Banana(BananaError error) implements FruitError {}
+    record Cherry(CherryError error) implements FruitError {}
+}
+```
+
+```java
+Either<FruitError, Lemon> result = Either.<FruitError, Apple>right(apple)
+        .flatMap(a -> functionA.apply(a).mapLeft(FruitError.Apple::new))
+        .flatMap(b -> functionB.apply(b).mapLeft(FruitError.Banana::new))
+        .flatMap(c -> functionC.apply(c).mapLeft(FruitError.Cherry::new));
+```
