@@ -1856,4 +1856,120 @@ Either<FruitError, Lemon> result = FruitEither.right(apple)
         .toEither();
 ```
 
+## 10.6 コンピュテーション式で暮らしを楽にする
 
+> vavrのEitherとコンピュテーション式の違いはありますか? 
+
+## VavrとF#コンピュテーション式の違い
+
+本質的な違いは「**構文サポートの有無**」です。最大の違い：ネストの深さ問題
+
+**F#（コンピュテーション式）**
+```fsharp
+// フラットに書ける
+let result = either {
+    let! x = getUser(id)        // 失敗したら即座に抜ける
+    let! y = getOrder(x.id)     // xが使える
+    let! z = getInvoice(y.id)   // yが使える
+    return z.total
+}
+```
+
+**Vavr（Java）**
+```java
+// flatMapがネストしていく
+Either<Error, Double> result =
+    getUser(id)
+        .flatMap(x -> getOrder(x.getId())
+            .flatMap(y -> getInvoice(y.getId())  // ネストが深くなる
+                .map(z -> z.getTotal())));
+```
+
+## 10.7 モナドなど
+
+解説のみ
+
+## 10.8 非同期エフェクトの追加
+
+コンピュテーション式で簡潔に非同期処理を書いている。AIに移植方法を聞いてみる。
+
+> F#のコンピュテーション式で書かれているプログラムをJavaに移植する場合、どのような書き方で移植するのが良いですか? 移植するのに使えるライブラリやフレームワークがあれば教えてください。
+
+### F#のコンピュテーション式をJavaに移植する
+
+F#のコンピュテーション式（Computation Expression）は、モナド、ステートマシン、非同期処理などを宣言的に書くための強力な機能です。Javaには直接的な対応機能がないため、用途に応じた移植戦略が必要になります。
+
+#### まずコンピュテーション式の種類を特定する
+
+移植方針は、元のF#コードがどの種類のコンピュテーション式を使っているかで大きく変わります。代表的なものと、それぞれの移植先を整理します。
+
+**`async { ... }`（非同期処理）**
+→ Java の `CompletableFuture`、または Project Loom の仮想スレッド（Java 21+）、Kotlin Coroutines 相当を探すなら Project Reactor。
+
+**`task { ... }`（.NET Task）**
+→ 同上。`CompletableFuture` が最も近い。
+
+**`seq { ... }` / `list { ... }`（シーケンス生成）**
+→ Java Stream API、または `Iterable` を返すジェネレータ風の実装。Java には `yield` がないので、明示的な `Iterator` 実装か、Stream の `flatMap` で代替。
+
+**`option { ... }` / `result { ... }`（エラーハンドリングモナド）**
+→ `Optional<T>` / 自作 `Result<T, E>` 型、または **Vavr** の `Option` / `Either` / `Try`。
+
+**`query { ... }`（LINQ風クエリ）**
+→ Java Stream API、または JPA Criteria API / jOOQ。
+
+**カスタムコンピュテーション式**
+→ ビルダーパターン、または関数合成で書き直すのが現実的。
+
+#### 推奨ライブラリ
+
+| 用途 | ライブラリ |
+|---|---|
+| 関数型データ構造・モナド | **Vavr**（旧 Javaslang）|
+| リアクティブストリーム | **Project Reactor**, **RxJava** |
+| 非同期合成 | `CompletableFuture`（標準）|
+| 永続データ構造 | **Eclipse Collections**, **Immutables** |
+| パターンマッチ的な分岐 | Java 21+ の sealed classes + switch パターンマッチ |
+
+特に **Vavr** は、F# の `Option`、`Either`、`Try`、`Lazy`、`For`-comprehension に近い API を提供しており、コンピュテーション式の感覚をかなり残せます。
+
+#### 移植スタイルの選択肢
+
+##### 1. flatMap チェーンで書く（最も素直）
+
+F# の `let!` は本質的に `bind` (`flatMap`) なので、Optional や CompletableFuture の `flatMap` / `thenCompose` で素直に書けます。
+
+```java
+// F#: result { let! a = getA(); let! b = getB(a); return a + b }
+getA()
+  .flatMap(a -> getB(a).map(b -> a + b));
+```
+
+ネストが深くなる欠点はありますが、標準APIで完結します。
+
+##### 2. Vavr の For-comprehension を使う
+
+Vavr は `For.yield` という構文で、F# の `let!` に近い書き味を提供します。
+
+```java
+import io.vavr.API.*;
+For(getA(), getB()).yield((a, b) -> a + b);
+```
+
+##### 3. ビルダーパターンに書き直す
+
+カスタムCEや DSL 的な用途は、Java の流暢なビルダーが最も実用的です。型安全にしたければ、ステージ型ビルダー（各メソッドが異なる型を返す）を使います。
+
+##### 4. 仮想スレッド + 同期的記述（Java 21+）
+
+`async` CE を移植するなら、Project Loom の仮想スレッドで同期的に書き直すのが最もシンプルです。`CompletableFuture` の合成地獄を避けられます。
+
+#### 実務的なアドバイス
+
+元のF#コードを一対一で写経しようとすると、Javaの言語的制約（`yield` 式、暗黙の `bind`、トップレベル関数など）に阻まれて不自然なコードになりがちです。コンピュテーション式が**何を抽象化していたか**を見極めて、Javaのイディオムで書き直すのが結局は保守しやすくなります。
+
+具体的にどんなF#コードを移植されますか？ 実際のコードを見せていただければ、より具体的な移植例を示せます。
+
+## 10.9 まとめ
+
+解説のみ
