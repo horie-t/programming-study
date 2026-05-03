@@ -1973,3 +1973,131 @@ For(getA(), getB()).yield((a, b) -> a + b);
 ## 10.9 まとめ
 
 解説のみ
+
+# 11章 シリアライズ
+
+## 11.1 永続化とシリアライズ
+
+解説のみ
+
+## 11.2 シリアライズのための設計
+
+解説のみ
+
+## 11.3 シリアライズコードとワークフローの連携
+
+```java
+public record MyInputType() {}
+public record MyOutputType() {}
+
+@FunctionalInterface
+public interface Workflow {
+    MyOutputType apply(MyInputType input);    
+}
+```
+
+```java
+public record MyInputDTO() {}
+public record MyOutputDTO() {}
+
+@FunctionalInterface
+public interface InputDtoToDomain {
+    MyInputType apply(MyInputDTO inputDTO);
+}
+
+@FunctionalInterface
+public interface OutputDtoFromDomain {
+    MyOutputDTO apply(MyOutputType output);
+}
+```
+
+補助クラスを用意する
+
+```java
+public final class Element<A> {
+    private final Function<Unit, A> arrow;  // 1 -> A
+
+    private Element(Function<Unit, A> arrow) { this.arrow = arrow; }
+
+    public static <A> Element<A> of(A a) {           // a: 1 -> A
+        return new Element<>(u -> a);
+    }
+
+    public <B> Element<B> andThen(Function<A, B> f) { // (1->A);(A->B) = 1->B
+        return new Element<>(arrow.andThen(f));
+    }
+
+    public A get() { return arrow.apply(Unit.INSTANCE); }
+}
+```
+
+```java
+WorkflowWithDto workflowWithDto = (inputDto) -> {
+    return Element.of(inputDto)
+            .andThen(inputDtoToDomain)
+            .andThen(workflow)
+            .andThen(outputFromDto)
+            .get();
+};
+```
+
+## 11.4 シリアライズの全体例
+
+多分、JacksonやLombokでなんとかできる話
+
+### 11.4.1 JSONシリアライザーのラッピング
+
+Springフレームワークで何とかしてくれる。
+
+### 11.4.2 シリアライズパイプラインの全体
+
+テストの例を書きながら解説。
+
+### 11.4.3 他のシリアライザーとの連携
+
+XMLの場合等の注意点の解説。
+
+### 11.4.4 複数バージョンのシリアライズ型を扱う
+
+「Versioning in an Event Sourced System」を紹介。
+
+## 11.5 ドメイン型をDTOに変換する方法
+
+### 11.5.1 単一ケース共用体
+
+プリミティブ型で表現する。
+
+### 11.5.2 オプション型
+
+Noneのケースをnullに置き換える
+
+### 11.5.3 レコード型
+
+オブジェクト。
+
+### 11.5.4 コレクション
+
+配列
+
+### 11.5.5 列挙体として扱える判別共用体
+
+シリアライズは整数で表現される。
+(大文字の文字列の方が良さそう)
+
+### 11.5.6 タプル
+
+### 11.5.7 選択型
+
+Jacksonライブラリか、Springフレームワーク側であったはず
+
+### 11.5.8 レコード型や選択型のマップを使ったシリアライズ
+
+Jacksonライブラリか、Springフレームワーク側であったはず
+
+### 11.5.9 ジェネリクス
+
+Jacksonライブラリか、Springフレームワーク側であったような…
+
+## 11.6 まとめ
+
+
