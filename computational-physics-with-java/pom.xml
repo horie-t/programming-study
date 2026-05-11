@@ -25,11 +25,12 @@
         </dependency>
         <dependency>
             <groupId>org.jzy3d</groupId>
-            <artifactId>jzy3d-emul-gl-awt</artifactId>
+            <artifactId>jzy3d-native-jogl-swing</artifactId>
             <version>${jzy3d.version}</version>
             <exclusions>
-                <!-- Processing が引き込む JOGL/GlueGen と衝突しないように除外。
-                     Jzy3d 側は emul-gl (純Java実装) を使う。 -->
+                <!-- Jzy3d は JOGL v2.4.0-rc4 を要求するが、Processing 4.5.3 が
+                     JOGL 2.6.0 を引き込むため、Jzy3d 側の JOGL/GlueGen を除外し
+                     Processing 側に統一する。 -->
                 <exclusion>
                     <groupId>org.jogamp.jogl</groupId>
                     <artifactId>*</artifactId>

@@ -1,7 +1,7 @@
 package study.computationalphysics;
 
 import org.jzy3d.chart.Chart;
-import org.jzy3d.chart.factories.EmulGLChartFactory;
+import org.jzy3d.chart.factories.SwingChartFactory;
 import org.jzy3d.colors.Color;
 import org.jzy3d.maths.Coord3d;
 import org.jzy3d.plot3d.primitives.LineStrip;
@@ -25,7 +25,7 @@ public class DampedOscillationPlot {
         line.setWireframeColor(Color.RED);
         line.setWireframeWidth(2f);
 
-        Chart chart = new EmulGLChartFactory().newChart(Quality.Advanced());
+        Chart chart = new SwingChartFactory().newChart(Quality.Advanced());
         chart.add(line);
         chart.getAxisLayout().setXAxisLabel("t");
         chart.getAxisLayout().setYAxisLabel("y = exp(-alpha*t) cos(omega*t)");
