@@ -14,6 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.11.3</junit.version>
         <processing.version>4.5.3</processing.version>
+        <jzy3d.version>2.2.1</jzy3d.version>
     </properties>
 
     <dependencies>
@@ -23,12 +24,37 @@
             <version>${processing.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.jzy3d</groupId>
+            <artifactId>jzy3d-emul-gl-awt</artifactId>
+            <version>${jzy3d.version}</version>
+            <exclusions>
+                <!-- Processing が引き込む JOGL/GlueGen と衝突しないように除外。
+                     Jzy3d 側は emul-gl (純Java実装) を使う。 -->
+                <exclusion>
+                    <groupId>org.jogamp.jogl</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.jogamp.gluegen</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <repositories>
+        <repository>
+            <id>jzy3d-releases</id>
+            <name>Jzy3d Releases</name>
+            <url>https://maven.jzy3d.org/releases/</url>
+        </repository>
+    </repositories>
 
     <build>
         <plugins>
