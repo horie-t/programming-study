@@ -15,6 +15,7 @@
         <junit.version>5.11.3</junit.version>
         <processing.version>4.5.3</processing.version>
         <jzy3d.version>2.2.1</jzy3d.version>
+        <commons-math3.version>3.6.1</commons-math3.version>
     </properties>
 
     <dependencies>
@@ -40,6 +41,11 @@
                     <artifactId>*</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-math3</artifactId>
+            <version>${commons-math3.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
