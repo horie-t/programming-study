@@ -137,15 +137,19 @@ Phase 1 の値オブジェクトを組み合わせたレコード。
 
 ### Phase 6: API/アダプタ層 (`PlaceOrder.Api.fs`)
 
-- [ ] 入力アダプタ (`adapter/in/web/`):
-  - [ ] `PlaceOrderController` (`POST /orders`)
-  - [ ] `PlaceOrderError` → HTTP ステータス変換
-- [ ] 出力アダプタ (`adapter/out/`, ダミー実装):
-  - [ ] `DummyProductCatalog` (`CheckProductCodeExists` + `GetProductPrice`)
-  - [ ] `DummyAddressChecker` (`CheckAddressExists`)
-  - [ ] `DummyAcknowledgmentSender` (`CreateOrderAcknowledgmentLetter` + `SendOrderAcknowledgment`)
-- [ ] Spring の `@Configuration` で依存を組み立て、`PlaceOrderService` を Bean 化
-- [ ] エンドツーエンドの WebMvcTest / 統合テスト
+- [x] 入力アダプタ (`adapter/in/web/`):
+  - [x] `PlaceOrderController` (`POST /orders`)
+  - [x] `PlaceOrderError` → HTTP ステータス変換 (Validation→400 / Pricing→422 / RemoteService→502)
+- [x] 出力アダプタ (`adapter/out/`, ダミー実装):
+  - [x] `DummyProductCatalog` (`CheckProductCodeExists` + `GetProductPrice`)
+  - [x] `DummyAddressChecker` (`CheckAddressExists`)
+  - [x] `DummyAcknowledgmentSender` (`CreateOrderAcknowledgmentLetter` + `SendOrderAcknowledgment`)
+- [x] Spring の `@Configuration` で依存を組み立て、`PlaceOrderService` を Bean 化 (`config/PlaceOrderConfiguration`)
+- [x] エンドツーエンドの統合テスト (`@SpringBootTest` + `MockMvcBuilders.webAppContextSetup`、3 ケース)
+
+> メモ: Spring Boot 4 では `@AutoConfigureMockMvc` がデフォルトの starter-test に含まれない (別モジュール `spring-boot-webmvc-test`)。
+> 依存追加を避け `spring-test` だけで動く `MockMvcBuilders.webAppContextSetup(wac)` 方式を採用。
+> 成功レスポンスは `PlaceOrderEventDto[]` (配列=要素型 reified) で返し、多態の `type` 判別子を確実に出力。
 
 ### Phase 7: 仕上げ (任意)
 - [ ] README の整備 (起動方法、サンプル curl)
