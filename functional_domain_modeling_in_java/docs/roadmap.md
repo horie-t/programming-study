@@ -87,27 +87,27 @@ Phase 1 の値オブジェクトを組み合わせたレコード。
 
 ### Phase 4: ワークフロー実装 (`PlaceOrder.Implementation.fs`)
 
-- [ ] 出力ポート (`application/port/out/` 配下):
+- [x] 出力ポート (`application/port/out/` 配下):
   - [x] `CheckProductCodeExists` (`ProductCode -> boolean`)
   - [x] `CheckAddressExists` (`UnvalidatedAddress -> Either<AddressValidationError, CheckedAddress>`)
   - [x] `GetProductPrice` (`ProductCode -> Price`)
   - [x] `CreateOrderAcknowledgmentLetter` (`PricedOrder -> HtmlString`)
   - [x] `SendOrderAcknowledgment` (`OrderAcknowledgment -> SendResult`)
-- [ ] 内部型 (`domain/model/order/internal/` 配下):
+- [x] 内部型 (`domain/model/order/internal/` 配下):
   - [x] `CheckedAddress`
   - [x] `ValidatedOrderLine`, `ValidatedOrder`
   - [x] `HtmlString`
   - [x] `OrderAcknowledgment`
   - [x] `AddressValidationError` (sealed: `InvalidFormat | AddressNotFound`)
   - [x] `SendResult` (sealed: `Sent | NotSent`)
-- [ ] ステップ実装 (`domain/service/` 配下):
+- [x] ステップ実装 (`domain/service/` 配下):
   - [x] `ValidateOrder` (依存: `CheckProductCodeExists`, `CheckAddressExists`)
   - [x] `PriceOrder` (依存: `GetProductPrice`)
   - [x] `AcknowledgeOrder` (依存: `CreateOrderAcknowledgmentLetter`, `SendOrderAcknowledgment`)
   - [x] `CreateEvents`
-- [ ] 全体ワークフロー (`application/` 配下):
-  - [ ] `PlaceOrderService` (`PlaceOrderUseCase` の実装、各ステップを合成)
-- [ ] 各ステップのユニットテスト
+- [x] 全体ワークフロー (`application/` 配下):
+  - [x] `PlaceOrderService` (`PlaceOrderUseCase` の実装、各ステップを合成)
+- [x] 各ステップのユニットテスト
 
 ### Phase 5: DTO 層 (`PlaceOrder.Dto.fs` → `adapter/in/web/dto/`)
 
