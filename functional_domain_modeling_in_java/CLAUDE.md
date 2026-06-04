@@ -43,8 +43,15 @@ com.example.fdmj/
         └── out/  # Output port interfaces (e.g. ProductCatalog, AddressChecker)
 ```
 
-- `core/` has zero dependency on `shell/` — domain logic must not depend on infrastructure
-- `shell/` depends on `core/` via interfaces defined in `core/`
+- The `domain` layer contains the core business logic and domain models, and pure functinal code without side effects.
+- The `adapter` layer contains the implementation of input and output adapters that interact with the outside world (e.g. REST controllers, database repositories).
+- The `application` layer contains the orchestration of use cases and coordinates between the domain and adapters, and has side effects (e.g. calling external services, sending messages).
+- domain/model: Contains the core domain models, defined as sealed interfaces and records to represent value objects and entities.
+- domain/service: Contains domain services that implement business logic and workflows.
+- adapter/in: Contains input adapters such as REST controllers that handle incoming requests and map them to application use cases.
+- adapter/out: Contains output adapters such as repositories and external service clients that implement the output port interfaces defined in the application layer.
+- application/port/in: Contains input port interfaces that define the use cases of the application (e.g. PlaceOrderUseCase).
+- application/port/out: Contains output port interfaces that define the dependencies on external systems (e.g. ProductCatalog, AddressChecker).
 
 ## Domain Design (docs/book.md)
 
