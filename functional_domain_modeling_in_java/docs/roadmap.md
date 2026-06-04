@@ -88,20 +88,20 @@ Phase 1 の値オブジェクトを組み合わせたレコード。
 ### Phase 4: ワークフロー実装 (`PlaceOrder.Implementation.fs`)
 
 - [ ] 出力ポート (`application/port/out/` 配下):
-  - [ ] `CheckProductCodeExists` (`ProductCode -> boolean`)
-  - [ ] `CheckAddressExists` (`UnvalidatedAddress -> Either<AddressValidationError, CheckedAddress>`)
+  - [x] `CheckProductCodeExists` (`ProductCode -> boolean`)
+  - [x] `CheckAddressExists` (`UnvalidatedAddress -> Either<AddressValidationError, CheckedAddress>`)
   - [ ] `GetProductPrice` (`ProductCode -> Price`)
   - [ ] `CreateOrderAcknowledgmentLetter` (`PricedOrder -> HtmlString`)
   - [ ] `SendOrderAcknowledgment` (`OrderAcknowledgment -> SendResult`)
 - [ ] 内部型 (`domain/model/order/internal/` 配下):
-  - [ ] `CheckedAddress`
-  - [ ] `ValidatedOrderLine`, `ValidatedOrder`
+  - [x] `CheckedAddress`
+  - [x] `ValidatedOrderLine`, `ValidatedOrder`
   - [ ] `HtmlString`
   - [ ] `OrderAcknowledgment`
-  - [ ] `AddressValidationError` (sealed: `InvalidFormat | AddressNotFound`)
+  - [x] `AddressValidationError` (sealed: `InvalidFormat | AddressNotFound`)
   - [ ] `SendResult` (sealed: `Sent | NotSent`)
 - [ ] ステップ実装 (`domain/service/` 配下):
-  - [ ] `ValidateOrder` (依存: `CheckProductCodeExists`, `CheckAddressExists`)
+  - [x] `ValidateOrder` (依存: `CheckProductCodeExists`, `CheckAddressExists`)
   - [ ] `PriceOrder` (依存: `GetProductPrice`)
   - [ ] `AcknowledgeOrder` (依存: `CreateOrderAcknowledgmentLetter`, `SendOrderAcknowledgment`)
   - [ ] `CreateEvents`

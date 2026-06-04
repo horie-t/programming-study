@@ -35,3 +35,8 @@ build/
 ### AI ###
 .ai/
 DomainModelingMadeFunctional
+
+### Hexagonal Architecture ###
+# 親ディレクトリの .gitignore で `out` がブロックされるが、ヘキサゴナルの output port パッケージは追跡する
+!src/main/java/com/example/fdmj/application/port/out/
+!src/main/java/com/example/fdmj/adapter/out/
