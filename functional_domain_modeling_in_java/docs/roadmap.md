@@ -56,33 +56,33 @@
 
 Phase 1 の値オブジェクトを組み合わせたレコード。
 
-- [ ] `PersonalName` (`FirstName`, `LastName`)
-- [ ] `CustomerInfo` (`Name`, `EmailAddress`)
-- [ ] `Address` (`AddressLine1` 〜 `AddressLine4`, `City`, `ZipCode`)
+- [x] `PersonalName` (`FirstName`, `LastName`)
+- [x] `CustomerInfo` (`Name`, `EmailAddress`)
+- [x] `Address` (`AddressLine1` 〜 `AddressLine4`, `City`, `ZipCode`)
 
 ### Phase 3: ワークフロー公開型 (`PlaceOrder.PublicTypes.fs`)
 
 境界づけられたコンテキストの公開境界。
 
-- [ ] 入力 (`application/port/in/` 配下):
-  - [ ] `UnvalidatedCustomerInfo`
-  - [ ] `UnvalidatedAddress`
-  - [ ] `UnvalidatedOrderLine`
-  - [ ] `UnvalidatedOrder`
-- [ ] 出力イベント (`domain/model/order/event/` 配下):
-  - [ ] `OrderAcknowledgmentSent`
-  - [ ] `OrderPlaced` (= `PricedOrder`)
-  - [ ] `BillableOrderPlaced`
-  - [ ] `PlaceOrderEvent` (sealed interface)
-- [ ] 価格付き状態 (`domain/model/order/` 配下):
-  - [ ] `PricedOrderLine`
-  - [ ] `PricedOrder`
-- [ ] エラー (`domain/model/order/error/` 配下):
-  - [ ] `ValidationError`
-  - [ ] `PricingError`
-  - [ ] `RemoteServiceError` (`ServiceInfo` を含む)
-  - [ ] `PlaceOrderError` (sealed interface)
-- [ ] ユースケースインタフェース `PlaceOrderUseCase`
+- [x] 入力 (`application/port/in/` 配下):
+  - [x] `UnvalidatedCustomerInfo`
+  - [x] `UnvalidatedAddress`
+  - [x] `UnvalidatedOrderLine`
+  - [x] `UnvalidatedOrder`
+- [x] 出力イベント (`domain/model/order/event/` 配下):
+  - [x] `OrderAcknowledgmentSent`
+  - [x] `OrderPlaced` (= `PricedOrder`)
+  - [x] `BillableOrderPlaced`
+  - [x] `PlaceOrderEvent` (sealed interface)
+- [x] 価格付き状態 (`domain/model/order/` 配下):
+  - [x] `PricedOrderLine`
+  - [x] `PricedOrder`
+- [x] エラー (`domain/model/order/error/` 配下):
+  - [x] `ValidationError`
+  - [x] `PricingError`
+  - [x] `RemoteServiceError` (`ServiceInfo` を含む)
+  - [x] `PlaceOrderError` (sealed interface)
+- [x] ユースケースインタフェース `PlaceOrderUseCase`
   - シグネチャ: `Either<PlaceOrderError, List<PlaceOrderEvent>> place(UnvalidatedOrder)`
 
 ### Phase 4: ワークフロー実装 (`PlaceOrder.Implementation.fs`)
