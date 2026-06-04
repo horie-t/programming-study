@@ -113,18 +113,27 @@ Phase 1 の値オブジェクトを組み合わせたレコード。
 
 各 DTO に `toDomain` / `fromDomain` (or `toUnvalidatedXxx`) を実装。
 
-- [ ] `CustomerInfoDto`
-- [ ] `AddressDto`
-- [ ] `OrderFormLineDto`
-- [ ] `OrderFormDto` (受信用ルート)
-- [ ] `PricedOrderLineDto`
-- [ ] `PricedOrderDto`
-- [ ] `OrderPlacedDto`
-- [ ] `BillableOrderPlacedDto`
-- [ ] `OrderAcknowledgmentSentDto`
-- [ ] `PlaceOrderEventDto` (発信用ルート、polymorphic)
-- [ ] `PlaceOrderErrorDto`
-- [ ] Jackson 設定で `VavrModule` を登録 (`Option`, `Either`, `List` のシリアライズ)
+**設計判断 (このセッションで確定)**: JSON は camelCase。多態イベントは Jackson `@JsonTypeInfo`(判別子フィールド `type`)。DTO は素の Java 型を使うため `vavr-jackson`/`VavrModule` 登録は**不要**(Spring Boot 4 の Jackson 3 mapper でドメインの Vavr 型を直接シリアライズしないため)。
+
+受信側 (Inbound: JSON → DTO → ドメイン):
+- [x] `CustomerInfoDto` (`toUnvalidatedCustomerInfo`)
+- [x] `AddressDto` (`toUnvalidatedAddress`)
+- [x] `OrderFormLineDto` (`toUnvalidatedOrderLine`)
+- [x] `OrderFormDto` (受信用ルート、`toUnvalidatedOrder`)
+
+発信側 (Outbound: ドメイン → DTO → JSON):
+- [x] `CustomerInfoDto` / `AddressDto` に `fromDomain` 追加 (受信側と共用)
+- [x] `PricedOrderLineDto`
+- [x] `OrderPlacedDto`
+- [x] `BillableOrderPlacedDto`
+- [x] `OrderAcknowledgmentSentDto`
+- [x] `PlaceOrderEventDto` (sealed interface + `@JsonTypeInfo`、`fromDomain` ディスパッチ)
+- [x] `PlaceOrderErrorDto` (`code` + `message`、`PlaceOrderError` を switch)
+- [x] ~~Jackson `VavrModule` 登録~~ → 不要と判断
+
+> ⚠️ Phase 6 メモ: 多態イベントの `type` 判別子は **要素型のジェネリクスが保持される場合のみ**出力される。
+> `@RestController` が `List<PlaceOrderEventDto>` を返せば Spring が型を保持するので問題ないが、
+> `Object`/raw 型で返すと `type` が欠落する。
 
 ### Phase 6: API/アダプタ層 (`PlaceOrder.Api.fs`)
 
