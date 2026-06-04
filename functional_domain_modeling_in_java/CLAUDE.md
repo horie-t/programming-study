@@ -31,14 +31,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 com.example.fdmj/
-├── core/
+├── domain/
 │   ├── model/     # Domain models (sealed interfaces, records for value objects)
 │   └── service/   # Domain services / workflow implementations
-└── shell/
-    ├── adapter/
-    │   ├── in/    # Input adapters (REST controllers, event consumers)
-    │   └── out/   # Output adapters (repositories, external service clients)
-    └── application/  # Application orchestration (use case coordinators)
+├── adapter/
+│   ├── in/    # Input adapters (REST controllers, event consumers)
+│   └── out/   # Output adapters (repositories, external service clients)
+└── application/  # Application orchestration (use case coordinators)
+    └── port/     # Input ports (use case interfaces)
+        ├── in/   # Input port interfaces (e.g. PlaceOrderUseCase)
+        └── out/  # Output port interfaces (e.g. ProductCatalog, AddressChecker)
 ```
 
 - `core/` has zero dependency on `shell/` — domain logic must not depend on infrastructure
