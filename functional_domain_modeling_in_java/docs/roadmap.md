@@ -152,9 +152,9 @@ Phase 1 の値オブジェクトを組み合わせたレコード。
 > 成功レスポンスは `PlaceOrderEventDto[]` (配列=要素型 reified) で返し、多態の `type` 判別子を確実に出力。
 
 ### Phase 7: 仕上げ (任意)
-- [ ] README の整備 (起動方法、サンプル curl)
-- [ ] 9 章版 (`PlaceOrder.Implementation(without effects).fs`) を別パッケージで再現するか検討
-- [ ] 13 章以降 (`OrderTakingEvolved`) の取り込み検討
+- [x] README の整備 (起動方法、サンプル curl)
+- [ ] ~~9 章版 (`PlaceOrder.Implementation(without effects).fs`) を別パッケージで再現するか検討~~ → 実施しない
+- [ ] ~~13 章以降 (`OrderTakingEvolved`) の取り込み検討~~ → 実施しない
 
 ---
 
