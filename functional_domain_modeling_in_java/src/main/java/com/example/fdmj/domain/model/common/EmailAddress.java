@@ -8,12 +8,6 @@ public record EmailAddress(String value) {
     private static final Pattern PATTERN = Pattern.compile(".+@.+");
 
     public static Either<String, EmailAddress> create(String fieldName, String value) {
-        if (value == null || value.isEmpty()) {
-            return Either.left(fieldName + ": Must not be null or empty");
-        }
-        if (!PATTERN.matcher(value).matches()) {
-            return Either.left(fieldName + ": '" + value + "' must match the pattern '" + PATTERN.pattern() + "'");
-        }
-        return Either.right(new EmailAddress(value));
+        return ConstrainedType.createLike(fieldName, EmailAddress::new, PATTERN, value);
     }
 }
