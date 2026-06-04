@@ -2108,4 +2108,37 @@ Jacksonライブラリか、Springフレームワーク側であったような�
 * コマンド(更新)とクエリ(読み取り)を分離する
 * 境界付けられたコンテキストは、それぞれ独自のデータストアを持つ必要がある
 
+## 12.1 永続化を端に追いやる
+
+
+```java
+public sealed interface InvoicePaymentResult permits InvoicePaymentResult.FullyPaid, InvoicePaymentResult.PartiallyPaid {
+    record FullyPaid() {}
+    record PartiallyPaid(UnpaidInvoicd unpaidInvoicd) {}
+}
+
+@FunctionalInterface
+public interface ApplyPayment {
+    InvoicePaymentResult apply(UnpaidInvoice unpaidInvoice, Payment payment);
+}
+
+ApplyPayment applyPaymentWorkflow = (unpaidInvoice, payment) -> {
+    var updatedInvoice = Element.of(unpaidInvoice)
+            .andThen(applyPayment.apply(payment))
+            .get();
+    
+    return isFullyPaid(unpaidInvoice) ? new FullyPaid() : new PartiallyPaid(updatedInvoice);
+};
+```
+
+```java
+public record PayInvoiceCommand(InvoiceId invoiceId, Payment payment) {}
+
+@FunctionalInterface
+public interface PayInvoice {
+    
+}
+
+```
+
 
