@@ -7,6 +7,10 @@ class UnicodeIDSProcessor:
         self.ids_to_kanji = {}  # "構造文字列" -> 漢字
         self.flat_to_kanji = {} # "構造記号なし文字列" -> 漢字 (構造を捨てた場合の復元用)
 
+        # 構造記号の定義
+        self.BINARY_OPERATORS = set("⿰⿱⿴⿵⿶⿷⿸⿹⿺⿻") # 後ろに2字取る記号
+        self.TERNARY_OPERATORS = set("⿲⿳")            # 後ろに3字取る記号
+
     def load_mock_data(self):
         """動作確認用のサンプルデータを登録する関数"""
         # 実際のids.txtのフォーマットに準拠したデータ構造
@@ -63,6 +67,20 @@ class UnicodeIDSProcessor:
                 # 漢字以外は1文字のリストとして保持
                 decomposed_result.append([char])
         return decomposed_result
+    
+    def decompose_to_flat_list(self, text):
+        """
+        文字列を完全にフラット化された1次元リストに分解する。
+        例: "雲" -> ['⿱', '雨', '⿱', '二', '厶']
+        """
+        flat_result = []
+        for char in text:
+            if char in self.kanji_to_ids:
+                components = self.kanji_to_ids[char]
+                flat_result.extend(components)
+            else:
+                flat_result.append(char)
+        return flat_result
 
     def restore_text(self, decomposed_result):
         """
@@ -85,6 +103,47 @@ class UnicodeIDSProcessor:
                 
         return "".join(restored_chars)
 
+    def restore_from_flat_list(self, flat_list):
+        """
+        完全にフラット化された1次元リストから、元の文章を復元する
+        """
+        stack = []
+        
+        # リストを【後ろから逆順に】スキャンしていく
+        for char in reversed(flat_list):
+            
+            # 1. 2変数演算子（⿰ や ⿱ など）に出会った場合
+            if char in self.BINARY_OPERATORS:
+                if len(stack) >= 2:
+                    op1 = stack.pop()
+                    op2 = stack.pop()
+                    combined = char + op1 + op2
+                    
+                    # 辞書にあれば漢字に変換、なければ構造文字列のままスタックに戻す
+                    kanji = self.ids_to_kanji.get(combined, combined)
+                    stack.append(kanji)
+                else:
+                    stack.append(char) # エラー防止用（パーツが足りない場合）
+
+            # 2. 3変数演算子（⿲ や ⿳）に出会った場合
+            elif char in self.TERNARY_OPERATORS:
+                if len(stack) >= 3:
+                    op1 = stack.pop()
+                    op2 = stack.pop()
+                    op3 = stack.pop()
+                    combined = char + op1 + op2 + op3
+                    
+                    kanji = self.ids_to_kanji.get(combined, combined)
+                    stack.append(kanji)
+                else:
+                    stack.append(char)
+
+            # 3. 通常のパーツ、またはひらがな・カタカナなどの場合
+            else:
+                stack.append(char)
+                
+        # 逆順で処理していたので、最後にスタックをひっくり返して結合する
+        return "".join(reversed(stack))
 
 # ==========================================
 # 🚀 実行テスト
@@ -117,3 +176,12 @@ if __name__ == "__main__":
     # 復元
     restored_flat = processor.restore_text(decomposed_flat)
     print(f"復元結果: {restored_flat}")
+
+    # -----------------------------------
+    # パターン3: 完全にフラット化された1次元リストから復元する場合
+    # -----------------------------------
+    print("\n--- パターン3: 完全にフラット化された1次元リストから復元 ---")
+    flat_token_list = processor.decompose_to_flat_list(original_text)
+    print(f"フラットなトークンリスト: {flat_token_list}")
+    restored_from_flat = processor.restore_from_flat_list(flat_token_list)
+    print(f"復元結果: {restored_from_flat}")
